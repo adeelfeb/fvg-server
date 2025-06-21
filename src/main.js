@@ -2,17 +2,17 @@
 import { app } from './app.js';
 import { connectDB } from './db/connect.js';
 import config from './config/index.js';
-// import ngrok from 'ngrok'; // Uncomment if you still need ngrok for local development
+const ngrok = (await import('ngrok')).default;
 
 const startServer = async () => {
     try {
-        await connectDB(); // Connect to PostgreSQL
+        // await connectDB(); // Connect to PostgreSQL
 
         const port = config.port || 8000;
         app.listen(port, () => {
             console.log(`🚀 Server is running on port: ${port}`);
-            console.log(`Environment: ${config.nodeEnv}`);
-            console.log(`Allowed CORS Origins: ${config.corsOrigin.join(', ')}`);
+            // console.log(`Environment: ${config.nodeEnv}`);
+            // console.log(`Allowed CORS Origins: ${config.corsOrigin.join(', ')}`);
             // console.log(`Session Secret set: ${!!config.sessionSecret}`); // For debugging
         });
 

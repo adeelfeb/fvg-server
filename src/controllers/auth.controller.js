@@ -1,95 +1,189 @@
-// src/controllers/auth.controller.js
-import { asyncHandler } from '../middlewares/asyncHandler.js';
-import { ApiError } from '../utils/ApiError.js';
-import { ApiResponse } from '../utils/ApiResponse.js';
-import User from '../models/user.model.js';
-import passport from 'passport';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+import { OAuth2Client } from 'google-auth-library';
 
-// Register a new user
-const registerUser = asyncHandler(async (req, res) => {
-    const { username, email, password } = req.body;
+const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET;
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-    if (!username || !email || !password) {
-        throw new ApiError(400, "All fields (username, email, password) are required");
-    }
+export const register = async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, role } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findByEmail(email);
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-        throw new ApiError(409, "User with this email already exists");
+      return res.status(400).json({ error: 'Email already exists' });
     }
 
-    const user = await User.create({ username, email, password });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const verificationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '1d' });
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        role,
+        verificationToken
+      }
+    });
+
+    if (role === 'CONTRACTOR') {
+      await prisma.profile.create({
+        data: {
+          userId: user.id,
+          skills: [],
+          remoteTools: [],
+          spokenLanguages: []
+        }
+      });
+    }
+
+    // Send verification email (implementation depends on your email service)
+    // await sendVerificationEmail(email, verificationToken);
+
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1h' });
+
+    res.status(201).json({ 
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        emailVerified: user.emailVerified
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await prisma.user.findUnique({ 
+      where: { email },
+      include: { profile: true }
+    });
+
+    if (!user || user.isFrozen) {
+      return res.status(401).json({ error: 'Invalid credentials or account frozen' });
+    }
+
+    if (user.password) {
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+    } else {
+      return res.status(401).json({ error: 'Please use Google login' });
+    }
+
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1h' });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        profile: user.profile,
+        emailVerified: user.emailVerified
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const googleLogin = async (req, res) => {
+  try {
+    const { tokenId } = req.body;
+    
+    const ticket = await googleClient.verifyIdToken({
+      idToken: tokenId,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+    
+    const { email, given_name, family_name, sub: googleId } = ticket.getPayload();
+    
+    let user = await prisma.user.findUnique({ 
+      where: { email },
+      include: { profile: true }
+    });
 
     if (!user) {
-        throw new ApiError(500, "Something went wrong while registering the user");
+      // Create new user with Google auth
+      user = await prisma.user.create({
+        data: {
+          email,
+          firstName: given_name,
+          lastName: family_name,
+          googleId,
+          emailVerified: true,
+          role: 'CLIENT' // Default role
+        },
+        include: { profile: true }
+      });
+    } else if (user.isFrozen) {
+      return res.status(401).json({ error: 'Account is frozen' });
+    } else if (!user.googleId) {
+      // Update existing user with Google ID
+      user = await prisma.user.update({
+        where: { email },
+        data: { googleId, emailVerified: true },
+        include: { profile: true }
+      });
     }
 
-    return res.status(201).json(
-        new ApiResponse(201, { id: user.id, username: user.username, email: user.email }, "User registered successfully")
-    );
-});
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1h' });
 
-// Login user
-const loginUser = asyncHandler(async (req, res, next) => {
-    passport.authenticate('local', (err, user, info) => {
-        if (err) {
-            console.error("Passport authentication error:", err);
-            return next(new ApiError(500, "Internal Server Error during login"));
-        }
-        if (!user) {
-            // Passport's `info` object contains the message for failed authentication
-            return res.status(401).json(new ApiResponse(401, null, info.message || "Invalid credentials"));
-        }
-
-        req.logIn(user, (err) => {
-            if (err) {
-                console.error("req.logIn error:", err);
-                return next(new ApiError(500, "Error logging in user"));
-            }
-
-            // Successfully logged in, Passport session is established.
-            // The cookie will be set by express-session.
-            return res.status(200).json(
-                new ApiResponse(200, { id: user.id, username: user.username, email: user.email }, "User logged in successfully")
-            );
-        });
-    })(req, res, next);
-});
-
-// Logout user
-const logoutUser = asyncHandler(async (req, res) => {
-    req.logOut((err) => {
-        if (err) {
-            console.error("Error logging out:", err);
-            throw new ApiError(500, "Error logging out user");
-        }
-        // Clear the session cookie from the client
-        res.clearCookie('connect.sid', { // 'connect.sid' is the default name for express-session cookie
-            secure: true,
-            httpOnly: false, // Must match the httpOnly setting when creating the cookie
-            sameSite: 'None', // Must match the sameSite setting when creating the cookie
-            domain: req.hostname === 'localhost' ? undefined : req.hostname // Adjust domain for production
-        });
-        return res.status(200).json(new ApiResponse(200, null, "User logged out successfully"));
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        profile: user.profile,
+        emailVerified: user.emailVerified
+      }
     });
-});
+  } catch (error) {
+    console.error('Google login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
-// Get current user details
-const getCurrentUser = asyncHandler(async (req, res) => {
-    if (!req.isAuthenticated()) {
-        throw new ApiError(401, "Not logged in");
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+    
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await prisma.user.findUnique({ where: { email: decoded.email } });
+    
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid token' });
     }
-    // req.user is populated by Passport
-    const user = req.user;
-    return res.status(200).json(
-        new ApiResponse(200, { id: user.id, username: user.username, email: user.email }, "Current user fetched successfully")
-    );
-});
-
-export {
-    registerUser,
-    loginUser,
-    logoutUser,
-    getCurrentUser
+    
+    await prisma.user.update({
+      where: { email: decoded.email },
+      data: { emailVerified: true, verificationToken: null }
+    });
+    
+    res.json({ message: 'Email verified successfully' });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(400).json({ error: 'Invalid or expired token' });
+  }
 };

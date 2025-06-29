@@ -1,3 +1,4 @@
+// 1. Configuration (No changes here)
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,6 +8,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 2. Enums (No changes here)
 enum UserRole {
   CLIENT
   CONTRACTOR
@@ -93,146 +95,151 @@ enum RateRange {
   NEGOTIABLE
 }
 
-model User {
-  id               String       @id @default(uuid())
-  email            String       @unique
-  password         String
-  firstName        String
-  lastName         String
-  role             UserRole     @default(CLIENT)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  stripeCustomerId String?
-  isActive         Boolean      @default(true)
-  
-  // Relationships
-  profile          Profile?
-  hiredContracts   ClientContractor[] @relation("clientHires")
-  contractsHired   ContractorClient[] @relation("contractorHires")
-  
-  @@unique([email])
-}
 
-model Profile {
-  id                      String       @id @default(uuid())
-  userId                  String       @unique
-  user                    User         @relation(fields: [userId], references: [id])
-  
-  // Professional Information
-  roleType                RoleType?
-  otherRoleType           String?
-  verticalSpecialization  VerticalSpecialization?
-  otherVertical           String?
-  yearsExperience         Int?
-  skills                  String[]
-  remoteTools            String[]
-  spokenLanguages        String[]
-  otherLanguage          String?
-  englishProficiency     EnglishProficiency?
-  rateRange              RateRange?
-  customRate             Float?
-  resumeUrl              String?
-  profilePhotoUrl        String?
-  internetSpeedScreenshotUrl String?
-  availability           Availability?
-  timezone              String?
-  country               String?
-  otherCountry          String?
-  videoIntroductionUrl  String?
-  
-  // Compliance
-  hipaaCertified         Boolean      @default(false)
-  professionalCertValid  Boolean      @default(false)
-  signedNda              Boolean      @default(false)
-  backgroundCheck        Boolean      @default(false)
-  criminalRecordCheck    Boolean      @default(false)
-  gdprTraining          Boolean      @default(false)
-  pciCompliance         Boolean      @default(false)
-  socialMediaScreening  Boolean      @default(false)
-  usInsuranceCompliance Boolean      @default(false)
-  canadaInsuranceCompliance Boolean  @default(false)
-  willingToSignNda      Boolean      @default(false)
-  willingBackgroundCheck Boolean     @default(false)
-  willingReferenceCheck  Boolean     @default(false)
-  privacyPolicyConsent   Boolean     @default(false)
-  creditCheck           Boolean      @default(false)
-  vulnerableSectorCheck Boolean     @default(false)
-  contactConsent        Boolean     @default(false)
-  emailConsent          Boolean     @default(false)
-  
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
-  
-  // Additional fields
-  bio                  String?
-  portfolioUrl         String?
-}
-
-// ... (previous enums remain the same) ...
+// 3. Models (Cleaned up and new feature added)
 
 model User {
-  id               String       @id @default(uuid())
-  email            String       @unique
-  password         String?
-  firstName        String
-  lastName         String
-  role             UserRole     @default(CLIENT)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  stripeCustomerId String?
-  isActive         Boolean      @default(true)
-  isFrozen         Boolean      @default(false)
-  googleId         String?
-  emailVerified    Boolean      @default(false)
+  id                String             @id @default(uuid())
+  email             String             @unique
+  password          String? // Optional for social logins
+  firstName         String
+  lastName          String
+  phoneNumber       String?            @unique // Added optional phone number, make it unique if desired
+  role              UserRole           @default(CLIENT)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  stripeCustomerId  String?
+  isActive          Boolean            @default(true)
+  isFrozen          Boolean            @default(false)
+  googleId          String?
+  emailVerified     Boolean            @default(false)
   verificationToken String?
-  
+
   // Relationships
-  profile          Profile?
-  hiredContracts   ClientContractor[] @relation("clientHires")
-  contractsHired   ContractorClient[] @relation("contractorHires")
-  meetings         Meeting[]
-  
+  profile           Profile?
+  meetings          Meeting[]
+  refreshTokens     RefreshToken[]
+
+  // Relationships for hiring
+  hiredContracts    ClientContractor[] @relation("clientHires")
+  contractsAsHired  ClientContractor[] @relation("contractorHires")
+
+  // NEW: Relationships for the "Liked Contractor" feature
+  likedContractors  LikedContractor[]  @relation("ClientLikes")
+  likedByClients    LikedContractor[]  @relation("ContractorLikedBy")
+
   @@unique([email])
   @@index([googleId])
+  @@index([phoneNumber]) // Optional: Add an index if you frequently query by phone number
 }
 
-// ... (previous Profile model remains the same) ...
+
+model Profile {
+  id                         String   @id @default(uuid())
+  userId                     String   @unique
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleType                   RoleType?
+  otherRoleType              String?
+  verticalSpecialization     VerticalSpecialization?
+  otherVertical              String?
+  yearsExperience            Int?
+  skills                     String[]
+  remoteTools                String[]
+  spokenLanguages            String[]
+  otherLanguage              String?
+  englishProficiency         EnglishProficiency?
+  rateRange                  RateRange?
+  customRate                 Float?
+  resumeUrl                  String?
+  profilePhotoUrl            String?
+  internetSpeedScreenshotUrl String?
+  availability               Availability?
+  timezone                   String?
+  country                    String?
+  otherCountry               String?
+  videoIntroductionUrl       String?
+  bio                        String?
+  portfolioUrl               String?
+
+  // Compliance fields...
+  hipaaCertified              Boolean @default(false)
+  professionalCertValid       Boolean @default(false)
+  signedNda                   Boolean @default(false)
+  backgroundCheck             Boolean @default(false)
+  criminalRecordCheck         Boolean @default(false)
+  gdprTraining                Boolean @default(false)
+  pciCompliance               Boolean @default(false)
+  socialMediaScreening        Boolean @default(false)
+  usInsuranceCompliance       Boolean @default(false)
+  canadaInsuranceCompliance   Boolean @default(false)
+  willingToSignNda            Boolean @default(false)
+  willingBackgroundCheck      Boolean @default(false)
+  willingReferenceCheck       Boolean @default(false)
+  privacyPolicyConsent        Boolean @default(false)
+  creditCheck                 Boolean @default(false)
+  vulnerableSectorCheck       Boolean @default(false)
+  contactConsent              Boolean @default(false)
+  emailConsent                Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 
 model ClientContractor {
-  id                  String     @id @default(uuid())
-  clientId            String
-  contractorId        String
-  hiredAt             DateTime   @default(now())
-  active              Boolean    @default(true)
-  endedAt             DateTime?
-  paymentIntentId     String?
-  paymentAmount       Float?
-  paymentStatus       String?    @default("pending")
-  
-  client              User       @relation(fields: [clientId], references: [id], name: "clientHires")
-  contractor          User       @relation(fields: [contractorId], references: [id], name: "contractorHires")
-  meetings            Meeting[]
-  
+  id              String    @id @default(uuid())
+  clientId        String
+  contractorId    String
+  hiredAt         DateTime  @default(now())
+  active          Boolean   @default(true)
+  endedAt         DateTime?
+  paymentIntentId String?
+  paymentAmount   Float?
+  paymentStatus   String?   @default("pending")
+
+  // Relationships
+  client       User      @relation(name: "clientHires", fields: [clientId], references: [id], onDelete: Cascade)
+  contractor   User      @relation(name: "contractorHires", fields: [contractorId], references: [id], onDelete: Cascade)
+  meetings     Meeting[]
+
+  // A client can only have one active contract with a contractor at a time.
+  // If re-hiring is possible, this unique constraint might need to be adjusted.
   @@unique([clientId, contractorId])
   @@index([contractorId])
   @@index([clientId])
 }
 
-model Meeting {
-  id              String   @id @default(uuid())
-  clientContractorId String
-  clientContractor ClientContractor @relation(fields: [clientContractorId], references: [id])
-  title           String
-  description     String?
-  startTime       DateTime
-  endTime         DateTime
-  meetingUrl      String
-  calendlyEventId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+// NEW MODEL: For the "Liked Contractor" feature
+model LikedContractor {
+  id           String   @id @default(uuid())
+  clientId     String
+  contractorId String
+  createdAt    DateTime @default(now())
+
+  // Relationships
+  client       User @relation("ClientLikes", fields: [clientId], references: [id], onDelete: Cascade)
+  contractor   User @relation("ContractorLikedBy", fields: [contractorId], references: [id], onDelete: Cascade)
+
+  // A client can only "like" a specific contractor once
+  @@unique([clientId, contractorId])
+  @@index([clientId])
 }
 
-// ... (RefreshToken model remains the same) ...
+model Meeting {
+  id                 String   @id @default(uuid())
+  clientContractorId String
+  clientContractor   ClientContractor @relation(fields: [clientContractorId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  startTime          DateTime
+  endTime            DateTime
+  meetingUrl         String
+  calendlyEventId    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  // You need to relate the meeting to the users involved as well for easy querying
+  attendees User[]
+}
 
 model RefreshToken {
   id        String   @id @default(uuid())
@@ -240,6 +247,6 @@ model RefreshToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
-  
-  user      User     @relation(fields: [userId], references: [id])
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

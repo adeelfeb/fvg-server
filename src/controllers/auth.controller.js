@@ -1,189 +1,229 @@
-import bcrypt from 'bcryptjs';
+import { UserRole } from '@prisma/client'; // Keep this, it's correct for the enum
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-import { OAuth2Client } from 'google-auth-library';
 
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET;
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Assuming these are correctly set up and exported from their respective paths
+import { asyncHandler } from '../middlewares/asyncHandler.js';
+import { ApiResponse } from '../utils/ApiResponse.js';
+import { ApiError } from '../utils/ApiError.js';
+import prisma from '../db/index.js'; // Using the centralized prisma instance
 
-export const register = async (req, res) => {
-  try {
-    const { email, password, firstName, lastName, role } = req.body;
+// Remove: const prisma = new PrismaClient(); // This line is redundant if you're importing from ../db/index.js
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email already exists' });
-    }
+// Helper function to generate access and refresh tokens
+const generateAccessAndRefreshTokens = async (userId) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: {
+                id: userId
+            },
+            // Select specific fields for the token payload
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                phoneNumber: true, // Include optional phone number
+            }
+        });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const verificationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '1d' });
-
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        role,
-        verificationToken
-      }
-    });
-
-    if (role === 'CONTRACTOR') {
-      await prisma.profile.create({
-        data: {
-          userId: user.id,
-          skills: [],
-          remoteTools: [],
-          spokenLanguages: []
+        if (!user) {
+            throw new ApiError(404, "User not found");
         }
-      });
+
+        // Construct a 'fullName' for the token if desired, or use firstName/lastName directly
+        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+
+        const accessToken = jwt.sign(
+            {
+                _id: user.id,
+                email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                fullName: fullName, // Add fullName derived from firstName/lastName
+                phoneNumber: user.phoneNumber, // Include optional phone number
+            },
+            process.env.ACCESS_TOKEN_SECRET,
+            {
+                expiresIn: process.env.ACCESS_TOKEN_EXPIRY
+            }
+        );
+
+        const refreshToken = jwt.sign(
+            {
+                _id: user.id
+            },
+            process.env.REFRESH_TOKEN_SECRET,
+            {
+                expiresIn: process.env.REFRESH_TOKEN_EXPIRY
+            }
+        );
+
+        // Update the user's refresh token in the database
+        // Assuming your User model has a refreshToken field as discussed previously
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { refreshToken: refreshToken }
+        });
+
+        return { accessToken, refreshToken };
+
+    } catch (error) {
+        console.error("Error generating tokens:", error); // Log the actual error for debugging
+        throw new ApiError(500, "Something went wrong while generating access and refresh tokens");
+    }
+}
+
+
+const loginUser = asyncHandler(async (req, res) => {
+    // 1. Get user credentials from req.body
+    const { email, password } = req.body; // No need for phoneNumber in login req.body, as we're logging in by email/password
+
+    if (!email || !password) {
+        throw new ApiError(400, "Email and password are required");
     }
 
-    // Send verification email (implementation depends on your email service)
-    // await sendVerificationEmail(email, verificationToken);
-
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1h' });
-
-    res.status(201).json({ 
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        emailVerified: user.emailVerified
-      }
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const user = await prisma.user.findUnique({ 
-      where: { email },
-      include: { profile: true }
-    });
-
-    if (!user || user.isFrozen) {
-      return res.status(401).json({ error: 'Invalid credentials or account frozen' });
-    }
-
-    if (user.password) {
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-    } else {
-      return res.status(401).json({ error: 'Please use Google login' });
-    }
-
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1h' });
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        profile: user.profile,
-        emailVerified: user.emailVerified
-      }
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-export const googleLogin = async (req, res) => {
-  try {
-    const { tokenId } = req.body;
-    
-    const ticket = await googleClient.verifyIdToken({
-      idToken: tokenId,
-      audience: process.env.GOOGLE_CLIENT_ID
-    });
-    
-    const { email, given_name, family_name, sub: googleId } = ticket.getPayload();
-    
-    let user = await prisma.user.findUnique({ 
-      where: { email },
-      include: { profile: true }
+    // 2. Find user in DB by email
+    const user = await prisma.user.findUnique({
+        where: {
+            email: email
+        }
     });
 
     if (!user) {
-      // Create new user with Google auth
-      user = await prisma.user.create({
+        throw new ApiError(404, "User with this email does not exist");
+    }
+
+    // 3. Compare password with hashed password
+    // Ensure that `user.password` is not null for non-social logins before comparing
+    if (!user.password) {
+        throw new ApiError(401, "Account set up without password. Please use social login.");
+    }
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Invalid user credentials");
+    }
+
+    // 4. Generate access and refresh tokens (JWT)
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user.id);
+
+    // 5. Send tokens in response
+    const options = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds (adjust as needed)
+    };
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    user: {
+                        id: user.id,
+                        email: user.email,
+                        firstName: user.firstName,
+                        lastName: user.lastName,
+                        phoneNumber: user.phoneNumber, // Include optional phone number in response
+                        role: user.role, // Include user role in response
+                        // Removed 'username', 'fullName', 'avatar' as they are not directly in your provided model
+                    },
+                    accessToken,
+                    refreshToken
+                },
+                "User logged in successfully"
+            )
+        );
+});
+
+
+const registerUser = asyncHandler(async (req, res) => {
+    // Include phoneNumber in destructuring, it's optional so no !phoneNumber check here
+    const { email, password, firstName, lastName, role, phoneNumber } = req.body;
+
+    // 1. Validation (add more robust validation)
+    // password is only required if it's not a social login, but here we assume it's always provided for a direct registration
+    if (!email || !password || !firstName || !lastName || !role) {
+        throw new ApiError(400, "Email, password, first name, last name, and role are required");
+    }
+
+    // Validate the role against the UserRole enum
+    if (!Object.values(UserRole).includes(role)) { // More robust check
+        throw new ApiError(400, "Invalid user role specified");
+    }
+
+    // 2. Check if user already exists by email
+    const existingUserByEmail = await prisma.user.findUnique({ where: { email } });
+    if (existingUserByEmail) {
+        throw new ApiError(409, "User with this email already exists");
+    }
+
+    // 2a. Check if user already exists by phone number (if provided and unique)
+    if (phoneNumber) {
+        const existingUserByPhone = await prisma.user.findUnique({ where: { phoneNumber } });
+        if (existingUserByPhone) {
+            throw new ApiError(409, "User with this phone number already exists");
+        }
+    }
+
+
+    // 3. Hash the password (Example - you must implement this)
+    // CRITICAL: UNCOMMENT AND USE THIS
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 4. Create the user in the database
+    const user = await prisma.user.create({
         data: {
-          email,
-          firstName: given_name,
-          lastName: family_name,
-          googleId,
-          emailVerified: true,
-          role: 'CLIENT' // Default role
-        },
-        include: { profile: true }
-      });
-    } else if (user.isFrozen) {
-      return res.status(401).json({ error: 'Account is frozen' });
-    } else if (!user.googleId) {
-      // Update existing user with Google ID
-      user = await prisma.user.update({
-        where: { email },
-        data: { googleId, emailVerified: true },
-        include: { profile: true }
-      });
+            email,
+            password: hashedPassword, // Use the hashed password
+            firstName,
+            lastName,
+            phoneNumber, // Pass the optional phone number
+            role
+        }
+    });
+
+    // 5. If the user is a contractor, create an empty profile for them
+    if (user.role === UserRole.CONTRACTOR) {
+        await prisma.profile.create({
+            data: {
+                userId: user.id
+                // All other profile fields will be null/default based on your Profile model
+            }
+        });
     }
 
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1h' });
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        profile: user.profile,
-        emailVerified: user.emailVerified
-      }
+    // 6. Remove password from the response object and select only necessary fields
+    const createdUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phoneNumber: true, // Include phone number in the response
+            role: true,
+            createdAt: true,
+            // Exclude password and refreshToken from the response
+        }
     });
-  } catch (error) {
-    console.error('Google login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
 
-export const verifyEmail = async (req, res) => {
-  try {
-    const { token } = req.params;
-    
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await prisma.user.findUnique({ where: { email: decoded.email } });
-    
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid token' });
+    if (!createdUser) {
+        throw new ApiError(500, "User registration failed. Please try again.");
     }
-    
-    await prisma.user.update({
-      where: { email: decoded.email },
-      data: { emailVerified: true, verificationToken: null }
-    });
-    
-    res.json({ message: 'Email verified successfully' });
-  } catch (error) {
-    console.error('Email verification error:', error);
-    res.status(400).json({ error: 'Invalid or expired token' });
-  }
+
+    return res.status(201).json(
+        new ApiResponse(201, createdUser, "User registered successfully")
+    );
+});
+
+
+export {
+    registerUser,
+    loginUser
 };

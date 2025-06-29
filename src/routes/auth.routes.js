@@ -1,17 +1,13 @@
 import { Router } from 'express';
-import {
-    registerUser,
-    loginUser,
-    logoutUser,
-    getCurrentUser
-} from '../controllers/auth.controller.js';
-import { verifyJWT } from '../middlewares/auth.middleware.js'; // If you're protecting /current-user
+import { registerUser, loginUser } from '../controllers/auth.controller.js';
 
 const router = Router();
 
+// PUBLIC ROUTES
 router.route("/register").post(registerUser);
 router.route("/login").post(loginUser);
-router.route("/logout").post(verifyJWT, logoutUser); // Protect logout
-router.route("/current-user").get(verifyJWT, getCurrentUser); // Protect current-user
+
+// SECURED ROUTES (Example)
+// router.route("/logout").post(verifyJWT, logoutUser);
 
 export default router;

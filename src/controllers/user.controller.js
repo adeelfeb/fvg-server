@@ -1,7 +1,9 @@
 // src/controllers/user.controller.js
-import { asyncHandler } from '../middlewares/asyncHandler.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
+import { ApiError } from '../utils/ApiError.js';
 import User from '../models/user.model.js'; // Assuming you have a User model
+
 
 const getUserProfile = asyncHandler(async (req, res) => {
     // This route would be protected by verifyJWT middleware

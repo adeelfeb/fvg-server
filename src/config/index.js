@@ -11,7 +11,7 @@ const config = {
     db: {
         user: process.env.DB_USER,
         host: process.env.DB_HOST,
-        database: process.env.DB_NAME,
+        database: process.env.DB_DATABASE, // <-- CORRECTED THIS LINE
         password: process.env.DB_PASSWORD,
         port: parseInt(process.env.DB_PORT || '5432', 10), // Ensure port is a number
         ssl: {

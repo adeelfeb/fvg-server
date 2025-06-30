@@ -1,0 +1,1 @@
+docker exec -it my-app-postgres-new psql -U testuser -d testdb

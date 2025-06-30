@@ -128,7 +128,6 @@ model User {
   likedContractors  LikedContractor[]  @relation("ClientLikes")
   likedByClients    LikedContractor[]  @relation("ContractorLikedBy")
 
-  @@unique([email])
   @@index([googleId])
   @@index([phoneNumber]) // Optional: Add an index if you frequently query by phone number
 }

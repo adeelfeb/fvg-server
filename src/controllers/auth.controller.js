@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 // Assuming these are correctly set up and exported from their respective paths
-import { asyncHandler } from '../middlewares/asyncHandler.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import prisma from '../db/index.js'; // Using the centralized prisma instance
@@ -146,10 +146,18 @@ const registerUser = asyncHandler(async (req, res) => {
     // Include phoneNumber in destructuring, it's optional so no !phoneNumber check here
     const { email, password, firstName, lastName, role, phoneNumber } = req.body;
 
+    // ... (previous code)
+
     // 1. Validation (add more robust validation)
-    // password is only required if it's not a social login, but here we assume it's always provided for a direct registration
-    if (!email || !password || !firstName || !lastName || !role) {
-        throw new ApiError(400, "Email, password, first name, last name, and role are required");
+    const missingFields = [];
+    if (!email) missingFields.push("email");
+    if (!password) missingFields.push("password");
+    if (!firstName) missingFields.push("firstName");
+    if (!lastName) missingFields.push("lastName");
+    if (!role) missingFields.push("role");
+
+    if (missingFields.length > 0) {
+        throw new ApiError(400, `The following fields are required: ${missingFields.join(", ")}`);
     }
 
     // Validate the role against the UserRole enum

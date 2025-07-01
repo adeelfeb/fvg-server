@@ -1,12 +1,12 @@
 // src/main.js
 import { app } from './app.js';
-import { connectDB } from './db/connect.js';
+import { connectDB } from './db/index.js';
 import config from './config/index.js';
 const ngrok = (await import('ngrok')).default;
 
 const startServer = async () => {
     try {
-        // await connectDB(); // Connect to PostgreSQL
+        await connectDB(); // Connect to PostgreSQL
 
         const port = config.port || 8000;
         app.listen(port, () => {

@@ -144,7 +144,11 @@ const loginUser = asyncHandler(async (req, res) => {
 
 const registerUser = asyncHandler(async (req, res) => {
     // Include phoneNumber in destructuring, it's optional so no !phoneNumber check here
+
+    console.log("Registering user with data:", req.body); // Debugging log to see incoming data
+    // Destructure the required fields from req.body
     const { email, password, firstName, lastName, role, phoneNumber } = req.body;
+
 
     // ... (previous code)
 
@@ -153,7 +157,7 @@ const registerUser = asyncHandler(async (req, res) => {
     if (!email) missingFields.push("email");
     if (!password) missingFields.push("password");
     if (!firstName) missingFields.push("firstName");
-    if (!lastName) missingFields.push("lastName");
+    if (!lastName) missingFields.push("lastName"); 
     if (!role) missingFields.push("role");
 
     if (missingFields.length > 0) {

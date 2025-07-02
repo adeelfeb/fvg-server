@@ -115,10 +115,14 @@ model User {
   emailVerified     Boolean            @default(false)
   verificationToken String?
 
+  // Removed accessToken and refreshToken fields from User model
+  // Access tokens are typically stateless and short-lived, held by the client.
+  // Refresh tokens are handled by the dedicated RefreshToken model below.
+
   // Relationships
   profile           Profile?
   meetings          Meeting[]
-  refreshTokens     RefreshToken[]
+  refreshTokens     RefreshToken[] // This is the correct place to manage refresh tokens
 
   // Relationships for hiring
   hiredContracts    ClientContractor[] @relation("clientHires")
@@ -129,17 +133,17 @@ model User {
   likedByClients    LikedContractor[]  @relation("ContractorLikedBy")
 
   @@index([googleId])
-  @@index([phoneNumber]) // Optional: Add an index if you frequently query by phone number
 }
 
 
+
 model Profile {
-  id                         String   @id @default(uuid())
-  userId                     String   @unique
-  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  roleType                   RoleType?
+  id                         String                 @id @default(uuid())
+  userId                     String                 @unique
+  user                       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleType                   RoleType[]             // <--- CHANGE THIS LINE
   otherRoleType              String?
-  verticalSpecialization     VerticalSpecialization?
+  verticalSpecialization     VerticalSpecialization[] // <--- CHANGE THIS LINE
   otherVertical              String?
   yearsExperience            Int?
   skills                     String[]
@@ -161,28 +165,29 @@ model Profile {
   portfolioUrl               String?
 
   // Compliance fields...
-  hipaaCertified              Boolean @default(false)
-  professionalCertValid       Boolean @default(false)
-  signedNda                   Boolean @default(false)
-  backgroundCheck             Boolean @default(false)
-  criminalRecordCheck         Boolean @default(false)
-  gdprTraining                Boolean @default(false)
-  pciCompliance               Boolean @default(false)
-  socialMediaScreening        Boolean @default(false)
-  usInsuranceCompliance       Boolean @default(false)
-  canadaInsuranceCompliance   Boolean @default(false)
-  willingToSignNda            Boolean @default(false)
-  willingBackgroundCheck      Boolean @default(false)
-  willingReferenceCheck       Boolean @default(false)
-  privacyPolicyConsent        Boolean @default(false)
-  creditCheck                 Boolean @default(false)
-  vulnerableSectorCheck       Boolean @default(false)
-  contactConsent              Boolean @default(false)
-  emailConsent                Boolean @default(false)
+  hipaaCertified             Boolean @default(false)
+  professionalCertValid      Boolean @default(false)
+  signedNda                  Boolean @default(false)
+  backgroundCheck            Boolean @default(false)
+  criminalRecordCheck        Boolean @default(false)
+  gdprTraining               Boolean @default(false)
+  pciCompliance              Boolean @default(false)
+  socialMediaScreening       Boolean @default(false)
+  usInsuranceCompliance      Boolean @default(false)
+  canadaInsuranceCompliance  Boolean @default(false)
+  willingToSignNda           Boolean @default(false)
+  willingBackgroundCheck     Boolean @default(false)
+  willingReferenceCheck      Boolean @default(false)
+  privacyPolicyConsent       Boolean @default(false)
+  creditCheck                Boolean @default(false)
+  vulnerableSectorCheck      Boolean @default(false)
+  contactConsent             Boolean @default(false)
+  emailConsent               Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
 
 model ClientContractor {
   id              String    @id @default(uuid())

@@ -157,9 +157,6 @@ CREATE UNIQUE INDEX "User_phoneNumber_key" ON "User"("phoneNumber");
 CREATE INDEX "User_googleId_idx" ON "User"("googleId");
 
 -- CreateIndex
-CREATE INDEX "User_phoneNumber_idx" ON "User"("phoneNumber");
-
--- CreateIndex
 CREATE UNIQUE INDEX "Profile_userId_key" ON "Profile"("userId");
 
 -- CreateIndex

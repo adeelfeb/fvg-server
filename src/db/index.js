@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 // Initialize Prisma Client
 // It's good practice to make the client accessible globally or in a single place.
 const prisma = new PrismaClient({
-    log: ['query', 'info', 'warn', 'error'], // Optional: Log database queries for debugging
+    // log: ['query', 'info', 'warn', 'error'], // Optional: Log database queries for debugging
 });
 
 // Function to connect to the database (Prisma's internal connection)

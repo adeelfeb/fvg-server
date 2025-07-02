@@ -1,12 +1,236 @@
-import { UserRole } from '@prisma/client'; // Keep this, it's correct for the enum
+import {
+    UserRole,
+    RoleType,
+    VerticalSpecialization,
+    EnglishProficiency,
+    Availability,
+    RateRange
+} from '@prisma/client';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-
-// Assuming these are correctly set up and exported from their respective paths
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
-import prisma from '../db/index.js'; // Using the centralized prisma instance
+import prisma from '../db/index.js';
+import jwt from 'jsonwebtoken';
+
+/**
+ * @description Register a new employee (contractor) with a detailed profile
+ * @route POST /api/v1/users/register-employee
+ * @access Public
+ */
+
+
+
+const registerEmployee = asyncHandler(async (req, res) => {
+    try {
+        // --- 1. DESTRUCTURE AND VALIDATE INPUT ---
+        console.log("Registering employee with data:", req.body); // Debugging log to see incoming data
+        const {
+            firstName,
+            lastName,
+            emailAddress,
+            password,
+            passwordConfirm, // Added for frontend password confirmation
+            roleType,
+            roleTypeOther,
+            verticalSpecialization,
+            verticalSpecializationOther,
+            yearsExperience,
+            skills,
+            remoteSoftwareTools,
+            spokenLanguages,
+            spokenLanguagesOther,
+            englishProficiency,
+            hourlyRate,
+            resumeUrl, // Now directly from frontend
+            profilePhotoUrl, // Now directly from frontend
+            internetSpeedScreenshotUrl, // Now directly from frontend
+            videoIntroductionUrl, // Now directly from frontend
+            portfolioUrl, // New field from frontend
+            availability,
+            timezone,
+            timezoneOther,
+            country,
+            countryOther,
+            complianceChecks,
+            otherComplianceChecks, // New field from frontend
+            contactConsent, // New field from frontend
+        } = req.body;
+
+        // --- Basic Field Validation ---
+        const missingFields = [];
+        if (!firstName) missingFields.push("firstName");
+        if (!lastName) missingFields.push("lastName");
+        if (!emailAddress) missingFields.push("emailAddress");
+        if (!password) missingFields.push("password");
+        if (!passwordConfirm) missingFields.push("passwordConfirm"); // Validate password confirmation
+        if (password !== passwordConfirm) throw new ApiError(400, "Passwords do not match.");
+        if (!roleType || roleType.length === 0) missingFields.push("roleType"); // roleType is now an array
+        if (!yearsExperience) missingFields.push("yearsExperience");
+        if (!englishProficiency) missingFields.push("englishProficiency");
+        if (!hourlyRate) missingFields.push("hourlyRate");
+        if (!availability) missingFields.push("availability");
+        if (!timezone) missingFields.push("timezone");
+        if (!country) missingFields.push("country");
+        if (!resumeUrl) missingFields.push("resumeUrl");
+        if (!profilePhotoUrl) missingFields.push("profilePhotoUrl");
+        if (!internetSpeedScreenshotUrl) missingFields.push("internetSpeedScreenshotUrl");
+        if (!contactConsent) missingFields.push("contactConsent"); // Ensure consent is given
+
+        if (missingFields.length > 0) {
+            throw new ApiError(400, `The following fields are required: ${missingFields.join(", ")}`);
+        }
+
+        // --- 2. CHECK FOR EXISTING USER ---
+        const existingUser = await prisma.user.findUnique({
+            where: { email: emailAddress },
+        });
+
+        if (existingUser) {
+            throw new ApiError(409, "An account with this email already exists.");
+        }
+
+        // --- 3. HASH PASSWORD ---
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // --- 4. FILE URLS ARE DIRECTLY FROM REQ.BODY ---
+        // No changes needed here as they are already destructured above.
+
+        // --- 5. CREATE USER AND PROFILE IN A TRANSACTION ---
+        const newEmployee = await prisma.$transaction(async (tx) => {
+            const user = await tx.user.create({
+                data: {
+                    firstName,
+                    lastName,
+                    email: emailAddress,
+                    password: hashedPassword,
+                    role: UserRole.CONTRACTOR, // Assign the CONTRACTOR role
+                },
+            });
+
+            // Helper to ensure array conversion for checkbox groups
+            const toArray = (value) => {
+                if (!value) return [];
+                return Array.isArray(value) ? value : [value];
+            };
+
+            // Helper for compliance checks
+            const hasCompliance = (check) => toArray(complianceChecks).includes(check);
+            const hasOtherCompliance = (check) => toArray(otherComplianceChecks).includes(check);
+
+            // Map roleType and verticalSpecialization from form values to Enum keys
+            const mapToEnum = (value, enumObject) => {
+                // Ensure value is an array if multiple are selected
+                const values = Array.isArray(value) ? value : [value];
+                return values.map(item => {
+                    // Normalize the input string to match the enum format (e.g., "Admin Assistant" -> "ADMIN_ASSISTANT")
+                    const enumKey = item
+                        .replace(/[^a-zA-Z0-9]/g, '_') // Replace non-alphanumeric with underscore
+                        .toUpperCase();
+                    if (enumObject[enumKey]) {
+                        return enumObject[enumKey];
+                    }
+                    console.warn(`Warning: Enum key not found for value "${item}". Attempted key: "${enumKey}"`);
+                    return null; // Or throw an error, depending on your strictness
+                }).filter(Boolean); // Remove any nulls if mapping failed
+            };
+
+            const profileData = {
+                userId: user.id,
+                // Handle multiple role types (checkboxes)
+                roleType: mapToEnum(roleType, RoleType),
+                otherRoleType: roleTypeOther,
+                // Handle multiple vertical specializations (checkboxes)
+                verticalSpecialization: mapToEnum(verticalSpecialization, VerticalSpecialization),
+                otherVertical: verticalSpecializationOther,
+                yearsExperience: parseInt(yearsExperience, 10),
+                skills: toArray(skills),
+                remoteTools: toArray(remoteSoftwareTools),
+                spokenLanguages: toArray(spokenLanguages),
+                otherLanguage: spokenLanguagesOther,
+                englishProficiency: EnglishProficiency[englishProficiency],
+                rateRange: RateRange[hourlyRate],
+                availability: Availability[availability],
+                timezone: timezone === 'Other' ? timezoneOther : timezone,
+                country: country === 'Other' ? countryOther : country,
+                resumeUrl,
+                profilePhotoUrl,
+                internetSpeedScreenshotUrl,
+                videoIntroductionUrl: videoIntroductionUrl || null, // Ensure null if empty string
+                portfolioUrl: portfolioUrl || null, // New field
+                hipaaCertified: hasCompliance('HIPAA Certified'),
+                professionalCertValid: hasCompliance('Professional Certification Validation'),
+                signedNda: hasCompliance('Signed NDA'),
+                backgroundCheck: hasCompliance('Background Check Completed'),
+                criminalRecordCheck: hasCompliance('Criminal Record Check (CRC)'),
+                gdprTraining: hasCompliance('GDPR Awareness/Training'),
+                pciCompliance: hasCompliance('PCI Compliance Awareness'),
+                socialMediaScreening: hasCompliance('Social media/public profile screening'),
+                usInsuranceCompliance: hasCompliance('U.S. State Insurance Compliance'),
+                // New compliance checks from the form
+                canadaInsuranceCompliance: hasCompliance('Canadian Insurance Compliance'),
+                willingToSignNda: hasCompliance('Willing to Sign NDA'),
+                willingBackgroundCheck: hasCompliance('Willing to Undergo Background Check'),
+                willingReferenceCheck: hasCompliance('Willing to Undergo Reference Checks'),
+                creditCheck: hasOtherCompliance('Credit check (if applicable)'),
+                vulnerableSectorCheck: hasOtherCompliance('Vulnerable sector check (if required for the role)'),
+            };
+
+            await tx.profile.create({ data: profileData });
+
+            return user;
+        });
+
+        // --- 6. PREPARE THE RESPONSE OBJECT ---
+        const createdEmployee = await prisma.user.findUnique({
+            where: { id: newEmployee.id },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                createdAt: true,
+                profile: true, // Include the profile data
+            },
+        });
+
+        if (!createdEmployee) {
+            throw new ApiError(500, "Something went wrong while creating the employee profile.");
+        }
+
+        // --- 7. GENERATE TOKENS ---
+        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(createdEmployee.id);
+
+        // --- 8. SEND THE FINAL RESPONSE ---
+        return res.status(201).json(
+            new ApiResponse(
+                201,
+                { user: createdEmployee, accessToken, refreshToken },
+                "Employee registered successfully. Your application is under review."
+            )
+        );
+
+    } catch (error) {
+        console.error("Error during employee registration:", error);
+        if (error instanceof ApiError) {
+            throw error;
+        }
+        // Handle potential Prisma validation errors
+        if (error.code === 'P2022') {
+            throw new ApiError(400, "Invalid data provided for one or more fields.");
+        }
+        // Handle unique constraint violation for email
+        if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
+             throw new ApiError(409, "An account with this email already exists.");
+        }
+        throw new ApiError(500, "An unexpected error occurred during registration.");
+    }
+});
+
+
+
+
 
 
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -15,13 +239,12 @@ const generateAccessAndRefreshTokens = async (userId) => {
             where: {
                 id: userId
             },
-            // Select specific fields for the token payload
             select: {
                 id: true,
                 email: true,
                 firstName: true,
                 lastName: true,
-                phoneNumber: true, // Include optional phone number
+                phoneNumber: true,
             }
         });
 
@@ -29,18 +252,18 @@ const generateAccessAndRefreshTokens = async (userId) => {
             throw new ApiError(404, "User not found");
         }
 
-        // Construct a 'fullName' for the token if desired, or use firstName/lastName directly
         const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
 
-        // Ensure ACCESS_TOKEN_SECRET and ACCESS_TOKEN_EXPIRY are defined in your .env
+        // Calculate ACCESS_TOKEN_EXPIRY in milliseconds for consistency if needed,
+        // but jwt.sign handles string formats like "1h", "7d" directly.
         const accessToken = jwt.sign(
             {
                 _id: user.id,
                 email: user.email,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                fullName: fullName, // Add fullName derived from firstName/lastName
-                phoneNumber: user.phoneNumber, // Include optional phone number
+                fullName: fullName,
+                phoneNumber: user.phoneNumber,
             },
             process.env.ACCESS_TOKEN_SECRET,
             {
@@ -48,39 +271,58 @@ const generateAccessAndRefreshTokens = async (userId) => {
             }
         );
 
-        // Ensure REFRESH_TOKEN_SECRET and REFRESH_TOKEN_EXPIRY are defined in your .env
+        // Calculate REFRESH_TOKEN_EXPIRY in milliseconds for the expiresAt field
+        let refreshTokenExpiryMs;
+        const expiryString = process.env.REFRESH_TOKEN_EXPIRY;
+        if (expiryString.endsWith('d')) {
+            refreshTokenExpiryMs = parseInt(expiryString) * 24 * 60 * 60 * 1000; // days to milliseconds
+        } else if (expiryString.endsWith('h')) {
+            refreshTokenExpiryMs = parseInt(expiryString) * 60 * 60 * 1000; // hours to milliseconds
+        } else if (expiryString.endsWith('m')) {
+            refreshTokenExpiryMs = parseInt(expiryString) * 60 * 1000; // minutes to milliseconds
+        } else if (expiryString.endsWith('s')) {
+            refreshTokenExpiryMs = parseInt(expiryString) * 1000; // seconds to milliseconds
+        } else {
+            // Default to 7 days if format is unexpected, or throw an error
+            console.warn("REFRESH_TOKEN_EXPIRY format not recognized, defaulting to 7 days.");
+            refreshTokenExpiryMs = 7 * 24 * 60 * 60 * 1000;
+        }
+
         const refreshToken = jwt.sign(
             {
                 _id: user.id
             },
             process.env.REFRESH_TOKEN_SECRET,
             {
-                expiresIn: process.env.REFRESH_TOKEN_EXPIRY
+                expiresIn: expiryString // Use the string format for JWT signing
             }
         );
 
-        // Update the user's refresh token in the database
-        // Assuming your User model has a refreshToken field
+        // Calculate the exact expiration date for the database field
+        const expiresAt = new Date(Date.now() + refreshTokenExpiryMs);
+
+        // Store the refresh token in the dedicated RefreshToken model
         await prisma.refreshToken.create({
             data: {
                 token: refreshToken,
                 userId: user.id,
+                expiresAt: expiresAt, // <--- THIS IS THE MISSING FIELD!
             }
         });
 
         return { accessToken, refreshToken };
 
     } catch (error) {
-        console.error("Error generating tokens:", error); // Log the actual error for debugging
-        // Re-throw as ApiError to be caught by asyncHandler
+        console.error("Error generating tokens:", error);
         throw new ApiError(500, "Something went wrong while generating access and refresh tokens");
     }
 };
 
 
+
 const registerUser = asyncHandler(async (req, res) => {
     try {
-        console.log("Registering user with data:", req.body); // Debugging log to see incoming data
+        // console.log("Registering user with data:", req.body); // Debugging log to see incoming data
         // Destructure the required fields from req.body
         const { email, password, firstName, lastName, role, phoneNumber } = req.body;
 
@@ -194,69 +436,81 @@ const registerUser = asyncHandler(async (req, res) => {
 
 
 const loginUser = asyncHandler(async (req, res) => {
-    // 1. Get user credentials from req.body
-    const { email, password } = req.body; // No need for phoneNumber in login req.body, as we're logging in by email/password
+   try {
+     // 1. Get user credentials from req.body
+     const { email, password } = req.body; // No need for phoneNumber in login req.body, as we're logging in by email/password
+ 
+     if (!email || !password) {
+         throw new ApiError(400, "Email and password are required");
+     }
+ 
+     // 2. Find user in DB by email
+     const user = await prisma.user.findUnique({
+         where: {
+             email: email
+         }
+     });
+ 
+     if (!user) {
+         throw new ApiError(404, "User with this email does not exist");
+     }
+ 
+     // 3. Compare password with hashed password
+     // Ensure that `user.password` is not null for non-social logins before comparing
+     if (!user.password) {
+         throw new ApiError(401, "Account set up without password. Please use social login.");
+     }
+     const isPasswordValid = await bcrypt.compare(password, user.password);
+ 
+     if (!isPasswordValid) {
+         throw new ApiError(401, "Invalid user credentials");
+     }
+ 
+     // 4. Generate access and refresh tokens (JWT)
+     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user.id);
+ 
+     // 5. Send tokens in response
+     const options = {
+         httpOnly: true,
+         secure: process.env.NODE_ENV === 'production',
+         sameSite: 'strict',
+         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds (adjust as needed)
+     };
+ 
+     return res
+         .status(200)
+         // .cookie("accessToken", accessToken, options)
+         // .cookie("refreshToken", refreshToken, options)
+         .json(
+             new ApiResponse(
+                 200,
+                 {
+                     user: {
+                         id: user.id,
+                         email: user.email,
+                         firstName: user.firstName,
+                         lastName: user.lastName,
+                         phoneNumber: user.phoneNumber, // Include optional phone number in response
+                         role: user.role, // Include user role in response
+                         // Removed 'username', 'fullName', 'avatar' as they are not directly in your provided model
+                     },
+                     accessToken,
+                     refreshToken
+                 },
+                 "User logged in successfully"
+             )
+         );
+   } catch (error) {
+        console.error("Error during user login:", error);
 
-    if (!email || !password) {
-        throw new ApiError(400, "Email and password are required");
-    }
-
-    // 2. Find user in DB by email
-    const user = await prisma.user.findUnique({
-        where: {
-            email: email
+        // Re-throw the error. If it's already an ApiError (e.g., from validation or token generation),
+        // it will be passed directly to asyncHandler. Otherwise, it's wrapped in a generic ApiError.
+        if (error instanceof ApiError) {
+            throw error;
+        } else {
+            throw new ApiError(500, "An unexpected error occurred during login.", error.message);
         }
-    });
-
-    if (!user) {
-        throw new ApiError(404, "User with this email does not exist");
-    }
-
-    // 3. Compare password with hashed password
-    // Ensure that `user.password` is not null for non-social logins before comparing
-    if (!user.password) {
-        throw new ApiError(401, "Account set up without password. Please use social login.");
-    }
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-        throw new ApiError(401, "Invalid user credentials");
-    }
-
-    // 4. Generate access and refresh tokens (JWT)
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user.id);
-
-    // 5. Send tokens in response
-    const options = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds (adjust as needed)
-    };
-
-    return res
-        .status(200)
-        // .cookie("accessToken", accessToken, options)
-        // .cookie("refreshToken", refreshToken, options)
-        .json(
-            new ApiResponse(
-                200,
-                {
-                    user: {
-                        id: user.id,
-                        email: user.email,
-                        firstName: user.firstName,
-                        lastName: user.lastName,
-                        phoneNumber: user.phoneNumber, // Include optional phone number in response
-                        role: user.role, // Include user role in response
-                        // Removed 'username', 'fullName', 'avatar' as they are not directly in your provided model
-                    },
-                    accessToken,
-                    refreshToken
-                },
-                "User logged in successfully"
-            )
-        );
+   }
 });
 
 
@@ -264,5 +518,6 @@ const loginUser = asyncHandler(async (req, res) => {
 
 export {
     registerUser,
-    loginUser
+    loginUser,
+    registerEmployee
 };

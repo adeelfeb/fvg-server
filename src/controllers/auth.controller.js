@@ -1,10 +1,5 @@
 import {
-    UserRole,
-    RoleType,
-    VerticalSpecialization,
-    EnglishProficiency,
-    Availability,
-    RateRange
+    UserRole
 } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -24,13 +19,12 @@ import jwt from 'jsonwebtoken';
 const registerEmployee = asyncHandler(async (req, res) => {
     try {
         // --- 1. DESTRUCTURE AND VALIDATE INPUT ---
-        console.log("Registering employee with data:", req.body); // Debugging log to see incoming data
         const {
             firstName,
             lastName,
             emailAddress,
             password,
-            passwordConfirm, // Added for frontend password confirmation
+            passwordConfirm,
             roleType,
             roleTypeOther,
             verticalSpecialization,
@@ -42,19 +36,19 @@ const registerEmployee = asyncHandler(async (req, res) => {
             spokenLanguagesOther,
             englishProficiency,
             hourlyRate,
-            resumeUrl, // Now directly from frontend
-            profilePhotoUrl, // Now directly from frontend
-            internetSpeedScreenshotUrl, // Now directly from frontend
-            videoIntroductionUrl, // Now directly from frontend
-            portfolioUrl, // New field from frontend
+            resumeUrl,
+            profilePhotoUrl,
+            internetSpeedScreenshotUrl,
+            videoIntroductionUrl,
+            portfolioUrl,
             availability,
             timezone,
             timezoneOther,
             country,
             countryOther,
             complianceChecks,
-            otherComplianceChecks, // New field from frontend
-            contactConsent, // New field from frontend
+            otherComplianceChecks,
+            contactConsent,
         } = req.body;
 
         // --- Basic Field Validation ---
@@ -63,9 +57,9 @@ const registerEmployee = asyncHandler(async (req, res) => {
         if (!lastName) missingFields.push("lastName");
         if (!emailAddress) missingFields.push("emailAddress");
         if (!password) missingFields.push("password");
-        if (!passwordConfirm) missingFields.push("passwordConfirm"); // Validate password confirmation
+        if (!passwordConfirm) missingFields.push("passwordConfirm");
         if (password !== passwordConfirm) throw new ApiError(400, "Passwords do not match.");
-        if (!roleType || roleType.length === 0) missingFields.push("roleType"); // roleType is now an array
+        if (!roleType || !Array.isArray(roleType) || roleType.length === 0) missingFields.push("roleType");
         if (!yearsExperience) missingFields.push("yearsExperience");
         if (!englishProficiency) missingFields.push("englishProficiency");
         if (!hourlyRate) missingFields.push("hourlyRate");
@@ -75,7 +69,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
         if (!resumeUrl) missingFields.push("resumeUrl");
         if (!profilePhotoUrl) missingFields.push("profilePhotoUrl");
         if (!internetSpeedScreenshotUrl) missingFields.push("internetSpeedScreenshotUrl");
-        if (!contactConsent) missingFields.push("contactConsent"); // Ensure consent is given
+        if (contactConsent === undefined) missingFields.push("contactConsent"); // Check for presence, not just truthiness
 
         if (missingFields.length > 0) {
             throw new ApiError(400, `The following fields are required: ${missingFields.join(", ")}`);
@@ -93,10 +87,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
         // --- 3. HASH PASSWORD ---
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // --- 4. FILE URLS ARE DIRECTLY FROM REQ.BODY ---
-        // No changes needed here as they are already destructured above.
-
-        // --- 5. CREATE USER AND PROFILE IN A TRANSACTION ---
+        // --- 4. CREATE USER AND PROFILE IN A TRANSACTION ---
         const newEmployee = await prisma.$transaction(async (tx) => {
             const user = await tx.user.create({
                 data: {
@@ -104,60 +95,49 @@ const registerEmployee = asyncHandler(async (req, res) => {
                     lastName,
                     email: emailAddress,
                     password: hashedPassword,
-                    role: UserRole.CONTRACTOR, // Assign the CONTRACTOR role
+                    role: UserRole.CONTRACTOR,
                 },
             });
 
-            // Helper to ensure array conversion for checkbox groups
+            // Helper to ensure a value is an array.
             const toArray = (value) => {
                 if (!value) return [];
                 return Array.isArray(value) ? value : [value];
             };
 
-            // Helper for compliance checks
-            const hasCompliance = (check) => toArray(complianceChecks).includes(check);
-            const hasOtherCompliance = (check) => toArray(otherComplianceChecks).includes(check);
+            // Helpers for compliance checks
+            const safeComplianceChecks = toArray(complianceChecks);
+            const safeOtherComplianceChecks = toArray(otherComplianceChecks);
+            const hasCompliance = (check) => safeComplianceChecks.includes(check);
+            const hasOtherCompliance = (check) => safeOtherComplianceChecks.includes(check);
 
-            // Map roleType and verticalSpecialization from form values to Enum keys
-            const mapToEnum = (value, enumObject) => {
-                // Ensure value is an array if multiple are selected
-                const values = Array.isArray(value) ? value : [value];
-                return values.map(item => {
-                    // Normalize the input string to match the enum format (e.g., "Admin Assistant" -> "ADMIN_ASSISTANT")
-                    const enumKey = item
-                        .replace(/[^a-zA-Z0-9]/g, '_') // Replace non-alphanumeric with underscore
-                        .toUpperCase();
-                    if (enumObject[enumKey]) {
-                        return enumObject[enumKey];
-                    }
-                    console.warn(`Warning: Enum key not found for value "${item}". Attempted key: "${enumKey}"`);
-                    return null; // Or throw an error, depending on your strictness
-                }).filter(Boolean); // Remove any nulls if mapping failed
-            };
+            // The mapToEnum function is no longer needed as we are saving raw strings.
 
             const profileData = {
                 userId: user.id,
-                // Handle multiple role types (checkboxes)
-                roleType: mapToEnum(roleType, RoleType),
+                
+                // --- SIMPLIFIED DATA ASSIGNMENT ---
+                // Directly assign the string/array values from the request body.
+                roleType: toArray(roleType),
+                verticalSpecialization: toArray(verticalSpecialization),
+                rateRange: hourlyRate,
+                englishProficiency: englishProficiency,
+                availability: availability,
+                
                 otherRoleType: roleTypeOther,
-                // Handle multiple vertical specializations (checkboxes)
-                verticalSpecialization: mapToEnum(verticalSpecialization, VerticalSpecialization),
                 otherVertical: verticalSpecializationOther,
                 yearsExperience: parseInt(yearsExperience, 10),
                 skills: toArray(skills),
                 remoteTools: toArray(remoteSoftwareTools),
                 spokenLanguages: toArray(spokenLanguages),
                 otherLanguage: spokenLanguagesOther,
-                englishProficiency: EnglishProficiency[englishProficiency],
-                rateRange: RateRange[hourlyRate],
-                availability: Availability[availability],
                 timezone: timezone === 'Other' ? timezoneOther : timezone,
                 country: country === 'Other' ? countryOther : country,
                 resumeUrl,
                 profilePhotoUrl,
                 internetSpeedScreenshotUrl,
-                videoIntroductionUrl: videoIntroductionUrl || null, // Ensure null if empty string
-                portfolioUrl: portfolioUrl || null, // New field
+                videoIntroductionUrl: videoIntroductionUrl || null,
+                portfolioUrl: portfolioUrl || null,
                 hipaaCertified: hasCompliance('HIPAA Certified'),
                 professionalCertValid: hasCompliance('Professional Certification Validation'),
                 signedNda: hasCompliance('Signed NDA'),
@@ -167,13 +147,13 @@ const registerEmployee = asyncHandler(async (req, res) => {
                 pciCompliance: hasCompliance('PCI Compliance Awareness'),
                 socialMediaScreening: hasCompliance('Social media/public profile screening'),
                 usInsuranceCompliance: hasCompliance('U.S. State Insurance Compliance'),
-                // New compliance checks from the form
                 canadaInsuranceCompliance: hasCompliance('Canadian Insurance Compliance'),
                 willingToSignNda: hasCompliance('Willing to Sign NDA'),
                 willingBackgroundCheck: hasCompliance('Willing to Undergo Background Check'),
                 willingReferenceCheck: hasCompliance('Willing to Undergo Reference Checks'),
                 creditCheck: hasOtherCompliance('Credit check (if applicable)'),
                 vulnerableSectorCheck: hasOtherCompliance('Vulnerable sector check (if required for the role)'),
+                contactConsent: contactConsent,
             };
 
             await tx.profile.create({ data: profileData });
@@ -181,7 +161,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
             return user;
         });
 
-        // --- 6. PREPARE THE RESPONSE OBJECT ---
+        // --- 5. PREPARE THE RESPONSE OBJECT ---
         const createdEmployee = await prisma.user.findUnique({
             where: { id: newEmployee.id },
             select: {
@@ -191,7 +171,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
                 lastName: true,
                 role: true,
                 createdAt: true,
-                profile: true, // Include the profile data
+                profile: true,
             },
         });
 
@@ -199,32 +179,23 @@ const registerEmployee = asyncHandler(async (req, res) => {
             throw new ApiError(500, "Something went wrong while creating the employee profile.");
         }
 
-        // --- 7. GENERATE TOKENS ---
-        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(createdEmployee.id);
+        // --- 6. GENERATE TOKENS (Assuming this function exists) ---
+        // const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(createdEmployee.id);
 
-        // --- 8. SEND THE FINAL RESPONSE ---
+        // --- 7. SEND THE FINAL RESPONSE ---
         return res.status(201).json(
             new ApiResponse(
                 201,
-                { user: createdEmployee, accessToken, refreshToken },
+                // { user: createdEmployee, accessToken, refreshToken },
+                { user: createdEmployee }, // Simplified response without tokens for now
                 "Employee registered successfully. Your application is under review."
             )
         );
 
     } catch (error) {
         console.error("Error during employee registration:", error);
-        if (error instanceof ApiError) {
-            throw error;
-        }
-        // Handle potential Prisma validation errors
-        if (error.code === 'P2022') {
-            throw new ApiError(400, "Invalid data provided for one or more fields.");
-        }
-        // Handle unique constraint violation for email
-        if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
-             throw new ApiError(409, "An account with this email already exists.");
-        }
-        throw new ApiError(500, "An unexpected error occurred during registration.");
+        // Let the asyncHandler manage sending the error response
+        throw error;
     }
 });
 

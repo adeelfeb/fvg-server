@@ -24,7 +24,6 @@ const registerEmployee = asyncHandler(async (req, res) => {
             lastName,
             emailAddress,
             password,
-            passwordConfirm,
             roleType,
             roleTypeOther,
             verticalSpecialization,
@@ -51,14 +50,14 @@ const registerEmployee = asyncHandler(async (req, res) => {
             contactConsent,
         } = req.body;
 
+        // console.log("Registering employee with data:"); // Debugging log to see incoming data
+
         // --- Basic Field Validation ---
         const missingFields = [];
         if (!firstName) missingFields.push("firstName");
         if (!lastName) missingFields.push("lastName");
         if (!emailAddress) missingFields.push("emailAddress");
         if (!password) missingFields.push("password");
-        if (!passwordConfirm) missingFields.push("passwordConfirm");
-        if (password !== passwordConfirm) throw new ApiError(400, "Passwords do not match.");
         if (!roleType || !Array.isArray(roleType) || roleType.length === 0) missingFields.push("roleType");
         if (!yearsExperience) missingFields.push("yearsExperience");
         if (!englishProficiency) missingFields.push("englishProficiency");
@@ -86,6 +85,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
 
         // --- 3. HASH PASSWORD ---
         const hashedPassword = await bcrypt.hash(password, 10);
+        console.log("Password hashed successfully.", hashedPassword); // Debugging log to confirm password hashing
 
         // --- 4. CREATE USER AND PROFILE IN A TRANSACTION ---
         const newEmployee = await prisma.$transaction(async (tx) => {
@@ -180,14 +180,13 @@ const registerEmployee = asyncHandler(async (req, res) => {
         }
 
         // --- 6. GENERATE TOKENS (Assuming this function exists) ---
-        // const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(createdEmployee.id);
+        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(createdEmployee.id);
 
         // --- 7. SEND THE FINAL RESPONSE ---
         return res.status(201).json(
             new ApiResponse(
                 201,
-                // { user: createdEmployee, accessToken, refreshToken },
-                { user: createdEmployee }, // Simplified response without tokens for now
+                { user: createdEmployee, accessToken, refreshToken },
                 "Employee registered successfully. Your application is under review."
             )
         );
@@ -407,81 +406,88 @@ const registerUser = asyncHandler(async (req, res) => {
 
 
 const loginUser = asyncHandler(async (req, res) => {
-   try {
-     // 1. Get user credentials from req.body
-     const { email, password } = req.body; // No need for phoneNumber in login req.body, as we're logging in by email/password
- 
-     if (!email || !password) {
-         throw new ApiError(400, "Email and password are required");
-     }
- 
-     // 2. Find user in DB by email
-     const user = await prisma.user.findUnique({
-         where: {
-             email: email
-         }
-     });
- 
-     if (!user) {
-         throw new ApiError(404, "User with this email does not exist");
-     }
- 
-     // 3. Compare password with hashed password
-     // Ensure that `user.password` is not null for non-social logins before comparing
-     if (!user.password) {
-         throw new ApiError(401, "Account set up without password. Please use social login.");
-     }
-     const isPasswordValid = await bcrypt.compare(password, user.password);
- 
-     if (!isPasswordValid) {
-         throw new ApiError(401, "Invalid user credentials");
-     }
- 
-     // 4. Generate access and refresh tokens (JWT)
-     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user.id);
- 
-     // 5. Send tokens in response
-     const options = {
-         httpOnly: true,
-         secure: process.env.NODE_ENV === 'production',
-         sameSite: 'strict',
-         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds (adjust as needed)
-     };
- 
-     return res
-         .status(200)
-         // .cookie("accessToken", accessToken, options)
-         // .cookie("refreshToken", refreshToken, options)
-         .json(
-             new ApiResponse(
-                 200,
-                 {
-                     user: {
-                         id: user.id,
-                         email: user.email,
-                         firstName: user.firstName,
-                         lastName: user.lastName,
-                         phoneNumber: user.phoneNumber, // Include optional phone number in response
-                         role: user.role, // Include user role in response
-                         // Removed 'username', 'fullName', 'avatar' as they are not directly in your provided model
-                     },
-                     accessToken,
-                     refreshToken
-                 },
-                 "User logged in successfully"
-             )
-         );
-   } catch (error) {
+    try {
+        // 1. Get user credentials from req.body
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            throw new ApiError(400, "Email and password are required");
+        }
+
+        // 2. Find user in DB by email
+        const user = await prisma.user.findUnique({
+            where: {
+                email: email
+            },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                phoneNumber: true,
+                role: true,
+                createdAt: true,
+                password: true, // <--- ADD THIS LINE!
+            }
+        });
+
+        if (!user) {
+            throw new ApiError(404, "User with this email does not exist");
+        }
+
+        // 3. Compare password with hashed password
+        // Now, `user.password` will actually contain the hashed password from the DB
+        // So, this check will correctly identify users truly without a password (e.g., social logins)
+        // or allow bcrypt.compare to run if a password exists.
+        if (!user.password) { // This check is still good to differentiate social vs. local
+            throw new ApiError(401, "Account set up without password. Please use social login.");
+        }
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            throw new ApiError(401, "Invalid user credentials");
+        }
+
+        // 4. Generate access and refresh tokens (JWT)
+        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user.id);
+
+        // 5. Send tokens in response
+        const options = {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds (adjust as needed)
+        };
+
+        // It's generally good practice to remove the password from the `user` object
+        // before sending it back in the response for security reasons.
+        const userWithoutPassword = { ...user };
+        delete userWithoutPassword.password;
+
+        return res
+            .status(200)
+            // .cookie("accessToken", accessToken, options)
+            // .cookie("refreshToken", refreshToken, options)
+            .json(
+                new ApiResponse(
+                    200,
+                    {
+                        user: userWithoutPassword, // Send user object without password
+                        accessToken,
+                        refreshToken
+                    },
+                    "User logged in successfully"
+                )
+            );
+    } catch (error) {
         console.error("Error during user login:", error);
 
-        // Re-throw the error. If it's already an ApiError (e.g., from validation or token generation),
-        // it will be passed directly to asyncHandler. Otherwise, it's wrapped in a generic ApiError.
         if (error instanceof ApiError) {
             throw error;
         } else {
             throw new ApiError(500, "An unexpected error occurred during login.", error.message);
         }
-   }
+    }
 });
 
 

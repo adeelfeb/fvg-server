@@ -36,8 +36,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
       'https://fvg-global-assist.webflow.io',
-      "https://fvg-global-assist.webflow.io",
-      'https://your-production-domain.com'
+      "https://fvg-global-assist.webflow.io"
     ];
     
     // Allow requests with no origin (like mobile apps or curl requests)

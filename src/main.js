@@ -24,7 +24,7 @@ const startServer = async () => {
                     authtoken: process.env.NGROK_AUTH,
                     addr: port,
                 });
-                console.log(`🌐 Ngrok URL: ${ngrokUrl}`);
+                console.log(`🌐 Ngrok URL: ${ngrokUrl}/api/v1`);
                 // You can update your Google Auth callback URL here if needed
                 // conf.googleAuth.callbackUrl = `${ngrokUrl}/auth/google/callback`;
             } catch (ngrokError) {

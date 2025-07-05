@@ -64,10 +64,12 @@ app.use(passport.session()); // Enable Passport session support
 
 import authRouter from './routes/auth.routes.js';
 import userRouter from './routes/user.routes.js';
+import employeeRouter from './routes/employee.routes.js';
 // import testRouter from './routes/test.routes.js'
 
 app.use('/api/v1/auth', authRouter);
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/employee", employeeRouter);
 // app.use("/api/v1/test", testRouter);
 
 // Keep a simple root route

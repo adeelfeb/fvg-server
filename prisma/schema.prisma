@@ -52,6 +52,9 @@ model Profile {
   userId                     String    @unique
   user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
+  isVerified                 Boolean  @default(false) // This is your new field
+
+
   // --- MODIFIED FIELDS ---
   roleType                   String[]
   verticalSpecialization     String[]

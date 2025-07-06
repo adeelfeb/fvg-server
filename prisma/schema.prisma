@@ -52,15 +52,15 @@ model Profile {
   userId                     String    @unique
   user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  isVerified                 Boolean  @default(false) // This is your new field
+  isVerified                 Boolean  @default(false)  
 
 
   // --- MODIFIED FIELDS ---
   roleType                   String[]
   verticalSpecialization     String[]
   rateRange                  String?
-  englishProficiency         String? // Changed from EnglishProficiency? to String?
-  availability                 Boolean @default(true) // Now a Boolean with default true
+  englishProficiency         String?  
+  availability               String?
 
   otherRoleType              String?
   otherVertical              String?

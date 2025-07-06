@@ -1,21 +1,6 @@
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('CLIENT', 'CONTRACTOR', 'ADMIN');
 
--- CreateEnum
-CREATE TYPE "RoleType" AS ENUM ('ADMIN_ASSISTANT', 'EXECUTIVE_ASSISTANT', 'REMOTE_PROFESSIONAL', 'DATA_ENTRY', 'GRAPHIC_DESIGNER', 'UI_UX_DESIGNER', 'VIDEO_EDITOR', 'SOCIAL_MEDIA_MANAGER', 'SOFTWARE_DEVELOPER', 'IT_SUPPORT', 'QA_TESTER', 'ACCOUNTANT_CPA', 'BOOKKEEPER', 'PAYROLL_ADMIN', 'PARALEGAL', 'LAWYER_LLB_JD', 'LEGAL_ADMIN', 'ARCHITECTURAL_DRAFTER', 'CAD_TECHNICIAN', 'REVIT_SPECIALIST', 'MEDICAL_REMOTE_PROFESSIONAL', 'CLAIMS_PROCESSOR', 'EMR_ADMIN', 'SALES_ADMIN', 'LEAD_GEN_SPECIALIST', 'APPOINTMENT_SETTER', 'DIGITAL_MARKETER', 'SEO_SPECIALIST', 'ADS_MANAGER', 'CSR', 'TECH_SUPPORT', 'LIVE_CHAT_AGENT', 'OTHER_ROLE');
-
--- CreateEnum
-CREATE TYPE "VerticalSpecialization" AS ENUM ('RESIDENTIAL_ARCHITECTURE', 'LIGHT_COMMERCIAL', 'INSURANCE', 'REAL_ESTATE', 'E_COMMERCE', 'LEGAL_SERVICES', 'ACCOUNTING', 'HEALTHCARE', 'MARKETING_AGENCY', 'TECH_SAAS', 'EDUCATION', 'OTHER_VERTICAL');
-
--- CreateEnum
-CREATE TYPE "EnglishProficiency" AS ENUM ('A1_BEGINNER', 'A2_ELEMENTARY', 'B1_INTERMEDIATE', 'B2_UPPER_INTERMEDIATE', 'C1_ADVANCED', 'C2_PROFICIENT');
-
--- CreateEnum
-CREATE TYPE "Availability" AS ENUM ('FULL_TIME', 'PART_TIME', 'FREELANCE', 'PROJECT_BASED');
-
--- CreateEnum
-CREATE TYPE "RateRange" AS ENUM ('VOLUNTEER', 'ONE_TO_FOUR', 'FIVE_TO_SIX', 'SEVEN_TO_EIGHT', 'NINE_TO_TEN', 'ELEVEN_TO_FOURTEEN', 'FIFTEEN_TO_NINETEEN', 'TWENTY_TO_THIRTY', 'THIRTY_PLUS', 'NEGOTIABLE');
-
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
@@ -41,27 +26,27 @@ CREATE TABLE "User" (
 CREATE TABLE "Profile" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "roleType" "RoleType",
+    "isVerified" BOOLEAN NOT NULL DEFAULT false,
+    "roleType" TEXT[],
+    "verticalSpecialization" TEXT[],
+    "rateRange" TEXT,
+    "englishProficiency" TEXT,
+    "availability" TEXT,
     "otherRoleType" TEXT,
-    "verticalSpecialization" "VerticalSpecialization",
     "otherVertical" TEXT,
     "yearsExperience" INTEGER,
     "skills" TEXT[],
     "remoteTools" TEXT[],
     "spokenLanguages" TEXT[],
     "otherLanguage" TEXT,
-    "englishProficiency" "EnglishProficiency",
-    "rateRange" "RateRange",
     "customRate" DOUBLE PRECISION,
     "resumeUrl" TEXT,
     "profilePhotoUrl" TEXT,
     "internetSpeedScreenshotUrl" TEXT,
-    "availability" "Availability",
     "timezone" TEXT,
     "country" TEXT,
     "otherCountry" TEXT,
     "videoIntroductionUrl" TEXT,
-    "bio" TEXT,
     "portfolioUrl" TEXT,
     "hipaaCertified" BOOLEAN NOT NULL DEFAULT false,
     "professionalCertValid" BOOLEAN NOT NULL DEFAULT false,

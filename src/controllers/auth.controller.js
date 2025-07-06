@@ -85,7 +85,7 @@ const registerEmployee = asyncHandler(async (req, res) => {
 
         // --- 3. HASH PASSWORD ---
         const hashedPassword = await bcrypt.hash(password, 10);
-        console.log("Password hashed successfully.", hashedPassword); // Debugging log to confirm password hashing
+        // console.log("Password hashed successfully.", hashedPassword); // Debugging log to confirm password hashing
 
         // --- 4. CREATE USER AND PROFILE IN A TRANSACTION ---
         const newEmployee = await prisma.$transaction(async (tx) => {
@@ -123,7 +123,6 @@ const registerEmployee = asyncHandler(async (req, res) => {
                 rateRange: hourlyRate,
                 englishProficiency: englishProficiency,
                 availability: availability,
-                
                 otherRoleType: roleTypeOther,
                 otherVertical: verticalSpecializationOther,
                 yearsExperience: parseInt(yearsExperience, 10),

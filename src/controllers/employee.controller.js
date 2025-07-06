@@ -11,7 +11,7 @@ import prisma from '../db/index.js';                  // Assuming this path
  */
 const getVerifiedContractors = asyncHandler(async (req, res) => {
     try {
-        console.log("Fetching verified contractors...");
+        // console.log("Fetching verified contractors...");
         const verifiedContractors = await prisma.user.findMany({
             where: {
                 role: UserRole.CONTRACTOR,

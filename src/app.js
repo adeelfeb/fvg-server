@@ -48,8 +48,8 @@ const corsOptions = {
   },
   credentials: false,
   exposedHeaders: ['set-cookie'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Added OPTIONS for preflight requests
-  allowedHeaders: ['Content-Type', 'Authorization'] // Essential for headers like Authorization
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],  
+  allowedHeaders: ['Content-Type', 'Authorization']  
 };
 
 app.use(cors(corsOptions));

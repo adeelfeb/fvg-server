@@ -11,6 +11,7 @@ import prisma from '../db/index.js';                  // Assuming this path
  */
 const getVerifiedContractors = asyncHandler(async (req, res) => {
     try {
+        console.log("Fetching verified contractors...");
         const verifiedContractors = await prisma.user.findMany({
             where: {
                 role: UserRole.CONTRACTOR,
@@ -39,7 +40,6 @@ const getVerifiedContractors = asyncHandler(async (req, res) => {
                         rateRange: true, // Show the range, not exact customRate
                         timezone: true,
                         country: true,
-                        // Exclude sensitive compliance fields, resumeUrl, internetSpeedScreenshotUrl etc.
                     },
                 },
             },
@@ -91,7 +91,7 @@ const getVerifiedContractorsLogin = asyncHandler(async (req, res) => {
 
                 profile: {
                     select: {
-                        id: true, // Profile ID
+                        id: true,  
                         roleType: true,
                         verticalSpecialization: true,
                         yearsExperience: true,
@@ -99,12 +99,11 @@ const getVerifiedContractorsLogin = asyncHandler(async (req, res) => {
                         remoteTools: true,
                         spokenLanguages: true,
                         englishProficiency: true,
-                        rateRange: true, // Show the range, not exact customRate
+                        rateRange: true,  
                         timezone: true,
                         country: true,
-                        profilePhotoUrl: true, // Essential for display
+                        profilePhotoUrl: true,  
                         videoIntroductionUrl: true,
-                        bio: true,
                         // portfolioUrl: true,
                         // resumeUrl: true, // Exclude sensitive compliance fields
                         // internetSpeedScreenshotUrl: true, // Exclude sensitive compliance fields

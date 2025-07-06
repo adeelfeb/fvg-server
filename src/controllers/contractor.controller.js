@@ -1,4 +1,4 @@
-import { asyncHandler } from '../middlewares/asyncHandler.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import prisma from '../db/index.js';
 import { UserRole } from '@prisma/client';
@@ -6,6 +6,7 @@ import { UserRole } from '@prisma/client';
 
 const getAllContractors = asyncHandler(async (req, res) => {
     // Find all users who have the role of CONTRACTOR
+    console.log("Fetching all contractors...");
     const contractors = await prisma.user.findMany({
         where: {
             role: UserRole.CONTRACTOR

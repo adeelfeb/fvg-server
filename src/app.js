@@ -12,8 +12,8 @@ const app = express();
 
 app.use(express.json({ limit: "10mb" })); // Keep basic JSON parser
 app.use(express.urlencoded({ extended: true, limit: "10mb" })); // Keep basic URL parser
-app.use(express.static("public")); // COMMENT THIS OUT FOR NOW
-app.use(cookieParser()); // COMMENT THIS OUT FOR NOW
+app.use(express.static("public"));  
+app.use(cookieParser()); 
 app.use(session({
     secret: config.sessionSecret,
     resave: false, // Don't save session if unmodified
@@ -46,15 +46,13 @@ const corsOptions = {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
-  exposedHeaders: ['set-cookie']
+  credentials: false,
+  exposedHeaders: ['set-cookie'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Added OPTIONS for preflight requests
+  allowedHeaders: ['Content-Type', 'Authorization'] // Essential for headers like Authorization
 };
 
 app.use(cors(corsOptions));
-
-// Handle preflight requests
-// app.options(/\/api\/.*/, cors(corsOptions));  // Regex literal format
-
 
 // Initialize Passport
 app.use(passport.initialize());

@@ -60,7 +60,7 @@ model Profile {
   verticalSpecialization     String[]
   rateRange                  String?
   englishProficiency         String? // Changed from EnglishProficiency? to String?
-  availability               String? // Changed from Availability? to String?
+  availability                 Boolean @default(true) // Now a Boolean with default true
 
   otherRoleType              String?
   otherVertical              String?
@@ -77,7 +77,6 @@ model Profile {
   country                    String?
   otherCountry               String?
   videoIntroductionUrl       String?
-  bio                        String?
   portfolioUrl               String?
 
   // Compliance fields...

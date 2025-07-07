@@ -7,15 +7,195 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import prisma from '../db/index.js';
 import jwt from 'jsonwebtoken';
+// jwt and generateAccessAndRefreshTokens are not needed for bulk registration as tokens are typically for single user login.
+// import jwt from 'jsonwebtoken';
+// import { generateAccessAndRefreshTokens } from '../utils/tokenGenerator.js'; // Assuming this utility exists
+
+/**
+ * @description Register multiple new employees (contractors) with detailed profiles in a single transaction
+ * @route POST /api/v1/users/register-multiple-employees
+ * @access Public (or appropriate for bulk operations)
+ * @param {Array<Object>} req.body - An array of employee objects, each containing the same fields as for single registration.
+ */
+const registerMultipleEmployees = asyncHandler(async (req, res) => {
+    try {
+        const employeesData = req.body;
+
+        // --- 1. VALIDATE INPUT: Ensure req.body is an array of objects ---
+        if (!Array.isArray(employeesData) || employeesData.length === 0) {
+            throw new ApiError(400, "Request body must be a non-empty array of employee objects.");
+        }
+
+        const createdEmployeeIds = []; // To store IDs of successfully created employees
+
+        // --- 2. PROCESS ALL EMPLOYEES IN A SINGLE TRANSACTION ---
+        // Increased the transaction timeout to 30 seconds (30000 ms) to prevent P2028 errors
+        await prisma.$transaction(async (tx) => {
+            for (const employee of employeesData) {
+                // --- 2.1. DESTRUCTURE AND VALIDATE INPUT FOR EACH EMPLOYEE ---
+                const {
+                    firstName,
+                    lastName,
+                    emailAddress,
+                    password,
+                    roleType,
+                    roleTypeOther,
+                    verticalSpecialization,
+                    verticalSpecializationOther,
+                    yearsExperience,
+                    skills,
+                    remoteSoftwareTools,
+                    spokenLanguages,
+                    spokenLanguagesOther,
+                    englishProficiency,
+                    hourlyRate,
+                    resumeUrl,
+                    profilePhotoUrl,
+                    internetSpeedScreenshotUrl,
+                    videoIntroductionUrl,
+                    portfolioUrl,
+                    availability,
+                    timezone,
+                    timezoneOther,
+                    country,
+                    countryOther,
+                    complianceChecks,
+                    otherComplianceChecks,
+                    contactConsent,
+                } = employee;
+
+                // --- Basic Field Validation for each employee ---
+                const missingFields = [];
+                if (!firstName) missingFields.push("firstName");
+                if (!lastName) missingFields.push("lastName");
+                if (!emailAddress) missingFields.push("emailAddress");
+                if (!password) missingFields.push("password");
+                if (!roleType || !Array.isArray(roleType) || roleType.length === 0) missingFields.push("roleType");
+                if (!yearsExperience) missingFields.push("yearsExperience");
+                if (!englishProficiency) missingFields.push("englishProficiency");
+                if (!hourlyRate) missingFields.push("hourlyRate");
+                if (!availability) missingFields.push("availability");
+                if (!timezone) missingFields.push("timezone");
+                if (!country) missingFields.push("country");
+                if (!resumeUrl) missingFields.push("resumeUrl");
+                if (!profilePhotoUrl) missingFields.push("profilePhotoUrl");
+                if (!internetSpeedScreenshotUrl) missingFields.push("internetSpeedScreenshotUrl");
+                if (contactConsent === undefined) missingFields.push("contactConsent");
+
+                if (missingFields.length > 0) {
+                    // Throwing an error here will rollback the entire transaction
+                    throw new ApiError(400, `Employee with email ${emailAddress} is missing required fields: ${missingFields.join(", ")}`);
+                }
+
+                // --- 2.2. CHECK FOR EXISTING USER FOR CURRENT EMPLOYEE ---
+                const existingUser = await tx.user.findUnique({
+                    where: { email: emailAddress },
+                });
+
+                if (existingUser) {
+                    // Throwing an error here will rollback the entire transaction
+                    throw new ApiError(409, `An account with email ${emailAddress} already exists. Cannot register duplicate.`);
+                }
+
+                // --- 2.3. HASH PASSWORD ---
+                const hashedPassword = await bcrypt.hash(password, 10);
+
+                // --- 2.4. CREATE USER AND PROFILE FOR CURRENT EMPLOYEE ---
+                const user = await tx.user.create({
+                    data: {
+                        firstName,
+                        lastName,
+                        email: emailAddress,
+                        password: hashedPassword,
+                        role: UserRole.CONTRACTOR,
+                    },
+                });
+
+                // Helper to ensure a value is an array.
+                const toArray = (value) => {
+                    if (!value) return [];
+                    return Array.isArray(value) ? value : [value];
+                };
+
+                // Helpers for compliance checks
+                const safeComplianceChecks = toArray(complianceChecks);
+                const safeOtherComplianceChecks = toArray(otherComplianceChecks);
+                const hasCompliance = (check) => safeComplianceChecks.includes(check);
+                const hasOtherCompliance = (check) => safeOtherComplianceChecks.includes(check);
+
+                const profileData = {
+                    userId: user.id,
+                    roleType: toArray(roleType),
+                    verticalSpecialization: toArray(verticalSpecialization),
+                    rateRange: hourlyRate,
+                    englishProficiency: englishProficiency,
+                    availability: availability,
+                    otherRoleType: roleTypeOther,
+                    otherVertical: verticalSpecializationOther,
+                    yearsExperience: parseInt(yearsExperience, 10),
+                    skills: toArray(skills),
+                    remoteTools: toArray(remoteSoftwareTools),
+                    spokenLanguages: toArray(spokenLanguages),
+                    otherLanguage: spokenLanguagesOther,
+                    timezone: timezone === 'Other' ? timezoneOther : timezone,
+                    country: country === 'Other' ? countryOther : country,
+                    resumeUrl,
+                    profilePhotoUrl,
+                    internetSpeedScreenshotUrl,
+                    videoIntroductionUrl: videoIntroductionUrl || null,
+                    portfolioUrl: portfolioUrl || null,
+                    hipaaCertified: hasCompliance('HIPAA Certified'),
+                    professionalCertValid: hasCompliance('Professional Certification Validation'),
+                    signedNda: hasCompliance('Signed NDA'),
+                    backgroundCheck: hasCompliance('Background Check Completed'),
+                    criminalRecordCheck: hasCompliance('Criminal Record Check (CRC)'),
+                    gdprTraining: hasCompliance('GDPR Awareness/Training'),
+                    pciCompliance: hasCompliance('PCI Compliance Awareness'),
+                    socialMediaScreening: hasCompliance('Social media/public profile screening'),
+                    usInsuranceCompliance: hasCompliance('U.S. State Insurance Compliance'),
+                    canadaInsuranceCompliance: hasCompliance('Canadian Insurance Compliance'),
+                    willingToSignNda: hasCompliance('Willing to Sign NDA'),
+                    willingBackgroundCheck: hasCompliance('Willing to Undergo Background Check'),
+                    willingReferenceCheck: hasCompliance('Willing to Undergo Reference Checks'),
+                    creditCheck: hasOtherCompliance('Credit check (if applicable)'),
+                    vulnerableSectorCheck: hasOtherCompliance('Vulnerable sector check (if required for the role)'),
+                    contactConsent: contactConsent,
+                };
+
+                await tx.profile.create({ data: profileData });
+                createdEmployeeIds.push(user.id); // Add ID to the list
+            }
+        }, {
+            timeout: 30000 // Set timeout to 30 seconds (default is usually 5 seconds)
+        });
+
+        // --- 3. SEND THE FINAL RESPONSE ---
+        return res.status(201).json(
+            new ApiResponse(
+                201,
+                { registeredCount: createdEmployeeIds.length, employeeIds: createdEmployeeIds },
+                `${createdEmployeeIds.length} employees registered successfully.`
+            )
+        );
+
+    } catch (error) {
+        console.error("Error during multiple employee registration:", error);
+        // The ApiError thrown within the transaction will be caught by asyncHandler
+        throw error;
+    }
+});
+
+
+
+
+
+
 
 /**
  * @description Register a new employee (contractor) with a detailed profile
  * @route POST /api/v1/users/register-employee
  * @access Public
  */
-
-
-
 const registerEmployee = asyncHandler(async (req, res) => {
     try {
         // --- 1. DESTRUCTURE AND VALIDATE INPUT ---
@@ -495,5 +675,6 @@ const loginUser = asyncHandler(async (req, res) => {
 export {
     registerUser,
     loginUser,
-    registerEmployee
+    registerEmployee,
+    registerMultipleEmployees
 };

@@ -9,89 +9,98 @@ import prisma from '../db/index.js';                  // Assuming this path
  * @access Public (or adjust with middleware for protected access, e.g., only authenticated clients can view details)
  * @body {string} employeeId - The ID of the employee to fetch.
  */
+
 const getEmployeeById = asyncHandler(async (req, res) => {
     try {
         const { employeeId } = req.body; // Extract employeeId from the request body
 
-        console.log("Request body:", employeeId); // Debugging line to check the request body
+        // console.log("Request body (employeeId):", employeeId); // Debugging line to check the request body
+
         if (!employeeId) {
             throw new ApiError(400, "Employee ID is required in the request body.");
         }
 
-        // console.log(`Fetching employee with ID: ${employeeId}...`);
-
         const employee = await prisma.user.findUnique({
             where: {
                 id: employeeId,
-                // Optionally, you might want to ensure they are a CONTRACTOR and/or verified
+                // Uncomment the line below if you only want to fetch profiles for users with the 'CONTRACTOR' role.
                 // role: UserRole.CONTRACTOR,
-                // profile: {
-                //     isVerified: true, // Only fetch verified profiles if desired
-                // },
             },
             select: {
                 id: true,
                 firstName: true,
                 lastName: true,
-                email: true, // Include email if this is for a detailed view where it's appropriate
-                phoneNumber: true, // Include phone number if appropriate
+                // Only include email/phoneNumber if genuinely needed for public profile view,
+                // otherwise it's a privacy concern.
+                email: true,
+                phoneNumber: true,
                 createdAt: true,
                 updatedAt: true,
                 profile: {
                     select: {
                         id: true, // Profile ID
+                        isVerified: true,
+
+                        // --- MODIFIED FIELDS (Matching your schema) ---
                         roleType: true,
-                        otherRoleType: true, // Assuming you want this if 'Other' is selected
                         verticalSpecialization: true,
-                        otherVerticalSpecialization: true, // Assuming you want this
+                        rateRange: true,
+                        englishProficiency: true,
+                        availability: true,
+
+                        otherRoleType: true,
+                        otherVertical: true, // Correct: matches schema
                         yearsExperience: true,
                         skills: true,
                         remoteTools: true,
                         spokenLanguages: true,
-                        otherSpokenLanguages: true, // Include if applicable
-                        englishProficiency: true,
-                        rateRange: true,
-                        customRate: true, // Include custom rate for detailed view
+                        otherLanguage: true,
+                        customRate: true,
                         resumeUrl: true,
                         profilePhotoUrl: true,
                         internetSpeedScreenshotUrl: true,
-                        introVideoUrl: true,
-                        portfolioUrl: true,
-                        availability: true,
                         timezone: true,
-                        otherTimezone: true, // Include if applicable
                         country: true,
-                        otherCountry: true, // Include if applicable
-                        // Compliance checks - only include if relevant for public/client view
+                        otherCountry: true,
+                        videoIntroductionUrl: true, // Correct: matches schema
+                        portfolioUrl: true,
+
+                        // --- Compliance fields (Matching your schema) ---
                         hipaaCertified: true,
-                        professionalCertificationValidation: true,
+                        professionalCertValid: true, // Correct: matches schema
                         signedNda: true,
-                        backgroundCheckCompleted: true,
+                        backgroundCheck: true, // Correct: matches schema
                         criminalRecordCheck: true,
-                        gdprAwarenessTraining: true,
-                        pciComplianceAwareness: true,
-                        socialMediaPublicProfileScreening: true,
-                        usStateInsuranceCompliance: true,
-                        canadianInsuranceCompliance: true,
+                        gdprTraining: true, // Correct: matches schema
+                        pciCompliance: true, // Correct: matches schema
+                        socialMediaScreening: true, // Correct: matches schema
+                        usInsuranceCompliance: true, // Correct: matches schema
+                        canadaInsuranceCompliance: true, // Correct: matches schema
                         willingToSignNda: true,
-                        willingToUndergoBackgroundCheck: true,
-                        willingToUndergoReferenceChecks: true,
-                        agreeToPrivacyPolicy: true,
-                        otherComplianceChecks: true,
+                        willingBackgroundCheck: true, // Correct: matches schema
+                        willingReferenceCheck: true, // Correct: matches schema
+                        privacyPolicyConsent: true, // Correct: matches schema
                         creditCheck: true,
                         vulnerableSectorCheck: true,
-                        canContactForJobOpportunities: true,
-                        // Make sure to add `isVerified` if you're using it to filter
-                        isVerified: true,
+                        contactConsent: true, // Correct: matches schema
+                        emailConsent: true, // Correct: matches schema
+
+                        createdAt: true,
+                        updatedAt: true,
+                        // Do NOT include `user` or `userId` here unless you specifically need to nest
+                        // the user object *within* the profile selection, which is usually redundant
+                        // as the parent `employee` object already contains the user details.
                     },
                 },
             },
         });
 
         if (!employee) {
-            throw new ApiError(404, "Employee not found.");
+            // If no employee is found with the given ID (or filters if applied)
+            throw new ApiError(404, "Employee not found or profile is not available.");
         }
 
+        // Send a successful response with the fetched employee data
         return res.status(200).json(
             new ApiResponse(
                 200,
@@ -101,16 +110,20 @@ const getEmployeeById = asyncHandler(async (req, res) => {
         );
 
     } catch (error) {
+        // Log the detailed error for debugging purposes on the server
         console.error("Error fetching employee by ID:", error);
-        // Ensure the error is an ApiError, otherwise create one
+
+        // Determine if it's a known API error or an unexpected one
         const apiError = error instanceof ApiError
             ? error
             : new ApiError(
                 500,
                 "An unexpected error occurred while fetching the employee profile.",
-                error.message
+                error.message // Pass the original error message for more detail
             );
-        throw apiError; // Re-throw for asyncHandler to catch
+
+        // Re-throw the ApiError so the asyncHandler can catch it and send a standardized error response
+        throw apiError;
     }
 });
 
@@ -119,15 +132,6 @@ const getEmployeeById = asyncHandler(async (req, res) => {
 
 
 
-
-
-
-
-/**
- * @description Fetches all verified contractor profiles with restricted details.
- * @route GET /api/v1/contractors/verified
- * @access Public (or adjust with middleware for protected access)
- */
 const getVerifiedContractors = asyncHandler(async (req, res) => {
     try {
         // console.log("Fetching verified contractors...");

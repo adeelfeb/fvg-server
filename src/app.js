@@ -36,7 +36,8 @@ const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
       'https://fvg-global-assist.webflow.io',
-      "https://fvg-global-assist.webflow.io"
+      "https://fvg-global-assist.webflow.io",
+      "https://fvg-global-assist.webflow.io/login"
     ];
     
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -46,7 +47,8 @@ const corsOptions = {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: false,
+  credentials: true, // Allow credentials (cookies, authorization headers, etc.)
+  optionsSuccessStatus: 200, // For legacy browser support
   exposedHeaders: ['set-cookie'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],  
   allowedHeaders: ['Content-Type', 'Authorization']  

@@ -44,6 +44,8 @@ model User {
   likedContractors LikedContractor[]  @relation("ClientLikes")
   likedByClients  LikedContractor[]  @relation("ContractorLikedBy")
 
+  payments            Payment[] 
+
   @@index([googleId])
 }
 
@@ -162,4 +164,29 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+
+
+// NEW: Payment Model for tracking all Stripe transactions
+model Payment {
+  id                  String    @id @default(uuid())
+  userId              String    // The user who made the payment
+  user                User      @relation(fields: [userId], references: [id])
+  stripeSessionId     String?   @unique // The Stripe Checkout Session ID (for one-time payments)
+  stripePaymentIntentId String? @unique // The Stripe Payment Intent ID (for direct charges or more detailed tracking)
+  amount              Int       // Amount in cents (e.g., 1000 for $10.00)
+  currency            String    // e.g., 'usd'
+  status              String    // e.g., 'paid', 'pending', 'failed', 'refunded'
+  description         String?   // Optional: A brief description of what was purchased
+  // You can add a JSON field for storing full Stripe event data or metadata if needed
+  // metadata            Json?     // Requires @prisma/client@2.23.0 or later and database support
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([stripeSessionId])
+  @@index([stripePaymentIntentId])
 }

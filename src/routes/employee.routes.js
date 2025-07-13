@@ -1,12 +1,14 @@
 import { Router } from 'express';
 // Assuming your controller functions are exported from these files
-import { getVerifiedContractors, getVerifiedContractorsLogin, getEmployeeById } from '../controllers/employee.controller.js';
+import { getVerifiedContractors, getVerifiedContractorsLogin, getEmployeeById, getContractorsByCategory } from '../controllers/employee.controller.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js'; // Adjust path as needed
 
 const router = Router();
 
 // Public routes (no authentication needed)
 router.route("/single-employee").post(getEmployeeById);
+router.route("/category/login").post(verifyJWT, getContractorsByCategory);
+router.route("/category/free").post( getContractorsByCategory);
 router.route("/verified").post(getVerifiedContractors);
 router.route("/login").post(verifyJWT, getVerifiedContractorsLogin);
 

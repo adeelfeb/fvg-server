@@ -10,6 +10,116 @@ import prisma from '../db/index.js';                  // Assuming this path
  * @body {string} employeeId - The ID of the employee to fetch.
  */
 
+
+
+const getContractorsByCategory = asyncHandler(async (req, res) => {
+    try {
+        const { roleType, verticalSpecialization } = req.body;
+
+        if ((!roleType || roleType.length === 0) && (!verticalSpecialization || verticalSpecialization.length === 0)) {
+            throw new ApiError(400, "Please provide at least one filter: roleType or verticalSpecialization.");
+        }
+
+        // console.log("Fetching contractors with raw filters:", { roleType, verticalSpecialization });
+
+        // Helper function to convert a slug (e.g., 'dental-admin') to Title Case (e.g., 'Dental Admin').
+        // This should match how the values are stored in your database.
+        const formatSlugToTitleCase = (slug) => {
+            if (!slug) return '';
+            return slug.split('-')
+                       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                       .join(' ');
+        };
+
+        // Convert incoming slugs to the format expected in the database
+        const formattedRoleTypes = roleType && roleType.length > 0
+            ? roleType.map(slug => formatSlugToTitleCase(slug))
+            : [];
+        
+        const formattedVerticalSpecializations = verticalSpecialization && verticalSpecialization.length > 0
+            ? verticalSpecialization.map(slug => formatSlugToTitleCase(slug))
+            : [];
+
+        console.log("Fetching contractors with formatted filters:", { formattedRoleTypes, formattedVerticalSpecializations });
+
+
+        // This array will hold the conditions for our OR search.
+        const filterConditions = [];
+
+        if (formattedRoleTypes.length > 0) {
+            filterConditions.push({
+                roleType: { hasSome: formattedRoleTypes }
+            });
+        }
+
+        if (formattedVerticalSpecializations.length > 0) {
+            filterConditions.push({
+                verticalSpecialization: { hasSome: formattedVerticalSpecializations }
+            });
+        }
+
+        const contractors = await prisma.user.findMany({
+            where: {
+                role: UserRole.CONTRACTOR,
+                profile: {
+                    isVerified: true,
+                    // The OR condition ensures a profile is returned if it matches ANY of the conditions inside the array.
+                    OR: filterConditions,
+                }
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                profile: {
+                    select: {
+                        id: true,
+                        roleType: true,
+                        verticalSpecialization: true,
+                        yearsExperience: true,
+                        remoteTools: true,
+                        spokenLanguages: true,
+                        englishProficiency: true,
+                        rateRange: true,
+                        timezone: true,
+                        // Ensure other fields you need are selected here
+                        profilePhotoUrl: true, // Added profilePhotoUrl as it's used on frontend
+                        country: true, // Added country as it's used on frontend
+                        otherCountry: true, // Added otherCountry as it's used on frontend
+                        otherRoleType: true, // Added otherRoleType for frontend rendering
+                        otherVertical: true, // Added otherVertical for frontend rendering
+                        skills: true, // Added skills for frontend rendering
+                    },
+                },
+            },
+        });
+
+        if (!contractors || contractors.length === 0) {
+            return res.status(200).json(
+                new ApiResponse(200, [], "No contractors found for the specified criteria.")
+            );
+        }
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                contractors,
+                "Contractor profiles fetched successfully."
+            )
+        );
+    } catch (error) {
+        console.error("Error fetching contractors by criteria:", error);
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(
+            500,
+            "An error occurred while fetching contractors.",
+            error.message
+        );
+    }
+});
+
+
+
 const getEmployeeById = asyncHandler(async (req, res) => {
     try {
         const { employeeId } = req.body; // Extract employeeId from the request body
@@ -264,5 +374,6 @@ const getVerifiedContractorsLogin = asyncHandler(async (req, res) => {
 export { 
     getVerifiedContractors,
     getVerifiedContractorsLogin,
-    getEmployeeById
+    getEmployeeById, 
+    getContractorsByCategory
  };

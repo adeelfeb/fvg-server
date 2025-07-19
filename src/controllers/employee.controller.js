@@ -20,28 +20,24 @@ const getContractorsByCategory = asyncHandler(async (req, res) => {
             throw new ApiError(400, "Please provide at least one filter: roleType or verticalSpecialization.");
         }
 
-        // console.log("Fetching contractors with raw filters:", { roleType, verticalSpecialization });
-
-        // Helper function to convert a slug (e.g., 'dental-admin') to Title Case (e.g., 'Dental Admin').
-        // This should match how the values are stored in your database.
+        // Updated helper function to convert slug (e.g., 'dental-admin') to UPPER CASE (e.g., 'DENTAL ADMIN')
         const formatSlugToTitleCase = (slug) => {
             if (!slug) return '';
             return slug.split('-')
-                       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                       .map(word => word.toUpperCase())
                        .join(' ');
         };
 
-        // Convert incoming slugs to the format expected in the database
+        // Convert incoming slugs to the format expected in the database (uppercase)
         const formattedRoleTypes = roleType && roleType.length > 0
             ? roleType.map(slug => formatSlugToTitleCase(slug))
             : [];
-        
+
         const formattedVerticalSpecializations = verticalSpecialization && verticalSpecialization.length > 0
             ? verticalSpecialization.map(slug => formatSlugToTitleCase(slug))
             : [];
 
-        console.log("Fetching contractors with formatted filters:", { formattedRoleTypes, formattedVerticalSpecializations });
-
+        // console.log("Fetching contractors with formatted filters:", { formattedRoleTypes, formattedVerticalSpecializations });
 
         // This array will hold the conditions for our OR search.
         const filterConditions = [];
@@ -62,8 +58,7 @@ const getContractorsByCategory = asyncHandler(async (req, res) => {
             where: {
                 role: UserRole.CONTRACTOR,
                 profile: {
-                    isVerified: true,
-                    // The OR condition ensures a profile is returned if it matches ANY of the conditions inside the array.
+                    // isVerified: false,
                     OR: filterConditions,
                 }
             },
@@ -82,13 +77,12 @@ const getContractorsByCategory = asyncHandler(async (req, res) => {
                         englishProficiency: true,
                         rateRange: true,
                         timezone: true,
-                        // Ensure other fields you need are selected here
-                        profilePhotoUrl: true, // Added profilePhotoUrl as it's used on frontend
-                        country: true, // Added country as it's used on frontend
-                        otherCountry: true, // Added otherCountry as it's used on frontend
-                        otherRoleType: true, // Added otherRoleType for frontend rendering
-                        otherVertical: true, // Added otherVertical for frontend rendering
-                        skills: true, // Added skills for frontend rendering
+                        profilePhotoUrl: true,
+                        country: true,
+                        otherCountry: true,
+                        otherRoleType: true,
+                        otherVertical: true,
+                        skills: true,
                     },
                 },
             },

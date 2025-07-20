@@ -234,8 +234,6 @@ const getEmployeeById = asyncHandler(async (req, res) => {
 
 
 
-
-
 const getVerifiedContractors = asyncHandler(async (req, res) => {
     try {
         // console.log("Fetching verified contractors...");

@@ -1099,6 +1099,7 @@ const loginUser = asyncHandler(async (req, res) => {
     try {
         // 1. Get user credentials from req.body
         const { email, password } = req.body;
+        // console.log("Login attempt with email:", email); // Debugging log to see incoming email
 
         if (!email || !password) {
             throw new ApiError(400, "Email and password are required");

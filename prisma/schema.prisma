@@ -81,6 +81,9 @@ model Profile {
   videoIntroductionUrl       String?
   portfolioUrl               String?
 
+  finalCost                   Float? // Using Float for currency values
+
+
   // Compliance fields...
   hipaaCertified             Boolean  @default(false)
   professionalCertValid      Boolean  @default(false)
@@ -103,6 +106,15 @@ model Profile {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model VpcPricing {
+  id          String   @id @default(uuid())
+  unitPrice   Int      // Storing in cents to avoid floating point issues, e.g., 7500 for $75.00
+  currency    String   // e.g., 'usd'
+  isActive    Boolean  @default(true) // To allow for future price changes without deleting old records
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 

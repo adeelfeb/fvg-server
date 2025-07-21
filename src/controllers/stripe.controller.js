@@ -3,6 +3,7 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import prisma from '../db/index.js'; // Your Prisma client
 import Stripe from 'stripe';
+import { UserRole } from '@prisma/client'; // Import UserRole if you need it for employee type checking
 
 // Initialize Stripe with your secret key
 // Ensure process.env.STRIPE_SECRET_KEY is loaded (e.g., using dotenv)
@@ -11,64 +12,130 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 /**
- * @description Creates a Stripe Checkout Session for one-time payments.
+ * @description Creates a Stripe Checkout Session for one-time payments, fetching prices from DB.
  * @route POST /api/v1/stripe/create-checkout-session
- * @access Protected (or Public, depending on your app's flow)
- * @param {Array<Object>} req.body.items - An array of items to purchase, e.g., [{ name: "Product A", price: 1000, quantity: 1 }]
- * price should be in cents (e.g., $10.00 is 1000)
+ * @access Protected (assumes verifyJWT middleware is used to populate req.user)
+ * @param {string} req.body.employeeId - The ID of the employee whose profile is being purchased.
+ * @param {number} req.body.vpcCount - The quantity of VPC (Virtual Private Cloud) units being purchased.
  * @param {string} req.user.id - The ID of the authenticated user (from verifyJWT middleware)
  */
 const createCheckoutSession = asyncHandler(async (req, res) => {
-    const { items } = req.body;
+    // console.log("Creating Stripe Checkout Session...", req.body);
+    // console.log("Authenticated user:", req.user);
+
+    const { employeeId, vpcCount } = req.body; // Extract employeeId and vpcCount
     const userId = req.user?.id; // Assuming req.user is populated by verifyJWT
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-        throw new ApiError(400, "Items array is required and cannot be empty.");
+    // --- Input Validation ---
+    if (!employeeId) {
+        throw new ApiError(400, "Employee ID is required for checkout.");
     }
-
+    if (vpcCount === undefined || typeof vpcCount !== 'number' || vpcCount < 0) {
+        throw new ApiError(400, "Valid VPC count (non-negative number) is required.");
+    }
     if (!userId) {
-        // This check is important if you make this route protected by verifyJWT
         throw new ApiError(401, "User not authenticated for checkout session creation.");
     }
 
     try {
-        // Transform items into Stripe's line_items format
-        const lineItems = items.map(item => {
-            // Ensure price is in cents and quantity is valid
-            const unitAmount = Math.round(parseFloat(item.price) * 100); // Convert to cents
-            if (isNaN(unitAmount) || unitAmount <= 0) {
-                throw new ApiError(400, `Invalid price for item: ${item.name}`);
-            }
-            if (isNaN(item.quantity) || item.quantity <= 0) {
-                throw new ApiError(400, `Invalid quantity for item: ${item.name}`);
-            }
+        const lineItems = [];
 
-            return {
-                price_data: {
-                    currency: 'usd', // Or your desired currency
-                    product_data: {
-                        name: item.name,
-                        description: item.description,
-                        images: item.images || [], // Optional: array of image URLs for the product
+        // 1. Fetch Employee's Final Cost
+        const employee = await prisma.user.findUnique({
+            where: {
+                id: employeeId,
+                // Optional: Ensure the employee is a CONTRACTOR if your logic requires
+                // role: UserRole.CONTRACTOR,
+            },
+            select: {
+                firstName: true,
+                lastName: true,
+                profile: {
+                    select: {
+                        finalCost: true, // Assuming this is the direct cost for buying the profile
                     },
-                    unit_amount: unitAmount, // Price in cents
                 },
-                quantity: item.quantity,
-            };
+            },
         });
+
+        // if (!employee || !employee.profile || employee.profile.finalCost === null) {
+        if (!employee || !employee.profile ) {
+            throw new ApiError(404, "Employee profile or final cost not found.");
+        }
+
+        const employeeCost = 20 || parseFloat(employee.profile.finalCost); // Ensure it's a number
+        if (isNaN(employeeCost) || employeeCost <= 0) {
+            throw new ApiError(400, "Invalid or zero employee final cost found in profile.");
+        }
+
+        // Add employee profile cost as a line item
+        lineItems.push({
+            price_data: {
+                currency: 'usd', // Use your desired currency
+                product_data: {
+                    name: `${employee.firstName} ${employee.lastName}'s Profile`,
+                    description: `Access to ${employee.firstName} ${employee.lastName}'s contact and detailed profile information.`,
+                    // images: [], // Add employee profile image URL if available
+                },
+                unit_amount: Math.round(employeeCost * 100), // Convert to cents
+            },
+            quantity: 1, // Always 1 for buying a profile
+        });
+
+        // 2. Fetch VPC Unit Price
+        // Find the currently active VPC pricing
+        const activeVpcPrice = await prisma.vpcPricing.findFirst({
+            where: {
+                isActive: true,
+            },
+            orderBy: {
+                createdAt: 'desc', // Get the most recently active one
+            },
+        });
+
+        if (!activeVpcPrice) {
+            throw new ApiError(500, "VPC unit price not configured. Please contact support.");
+        }
+
+        const vpcUnitPrice = parseFloat(activeVpcPrice.unitPrice); // Assuming unitPrice is stored as a number (e.g., float)
+        if (isNaN(vpcUnitPrice) || vpcUnitPrice <= 0) {
+            throw new ApiError(500, "Invalid VPC unit price found in configuration.");
+        }
+
+        if (vpcCount > 0) {
+            // Add VPCs as a line item if quantity is greater than 0
+            lineItems.push({
+                price_data: {
+                    currency: activeVpcPrice.currency || 'usd', // Use currency from DB if available, else default
+                    product_data: {
+                        name: `Virtual Private Call (VPC) Units`,
+                        description: `Bundle of ${vpcCount} VPC units for communication.`,
+                    },
+                    unit_amount: Math.round(vpcUnitPrice * 100), // Convert to cents
+                },
+                quantity: vpcCount,
+            });
+        }
+        
+        // --- Important: Ensure lineItems is not empty after fetching prices ---
+        if (lineItems.length === 0) {
+            throw new ApiError(400, "No items to purchase. Please select an employee and/or VPCs.");
+        }
 
         // Create a new checkout session
         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'], // Or other payment methods like 'paypal'
+            payment_method_types: ['card'],
             line_items: lineItems,
-            mode: 'payment', // For one-time payments. Use 'subscription' for recurring.
+            mode: 'payment',
             success_url: `${process.env.STRIPE_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: process.env.STRIPE_CANCEL_URL,
-            customer_email: req.user.email, // Pre-fill customer email if available from authenticated user
-            client_reference_id: userId, // Store your internal user ID with the session
+            customer_email: req.user.email,
+            client_reference_id: userId,
             metadata: {
-                userId: userId, // Custom metadata you can retrieve later
-                // You can add other relevant order IDs or details here
+                userId: userId,
+                employeeId: employeeId, // Store employee ID in metadata for later use in webhook
+                vpcCount: vpcCount,     // Store VPC count in metadata
+                // You could also stringify the entire lineItems array if needed, but keep it small
             },
         });
 
@@ -88,10 +155,12 @@ const createCheckoutSession = asyncHandler(async (req, res) => {
         if (error instanceof ApiError) {
             throw error;
         } else {
-            throw new ApiError(500, "Failed to create checkout session.", error.message);
+            // For unexpected errors, provide a generic message to the user
+            throw new ApiError(500, "Failed to create checkout session due to an internal error.", error.message);
         }
     }
 });
+
 
 /**
  * @description Handles Stripe webhook events.

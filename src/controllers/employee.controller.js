@@ -124,6 +124,17 @@ const getEmployeeById = asyncHandler(async (req, res) => {
             throw new ApiError(400, "Employee ID is required in the request body.");
         }
 
+        const vpcPriceRecord = await prisma.vpcPricing.findFirst({
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' }, // Get the most recent active price if multiple somehow exist
+        });
+
+        let vpcPrice = null;
+        if (vpcPriceRecord) {
+            // Convert cents back to dollars for the API response
+            vpcPrice = vpcPriceRecord.unitPrice / 100;
+        }
+
         const employee = await prisma.user.findUnique({
             where: {
                 id: employeeId,
@@ -151,7 +162,7 @@ const getEmployeeById = asyncHandler(async (req, res) => {
                         rateRange: true,
                         englishProficiency: true,
                         availability: true,
-
+                        finalCost: true, // Correct: matches schema
                         otherRoleType: true,
                         otherVertical: true, // Correct: matches schema
                         yearsExperience: true,
@@ -205,10 +216,15 @@ const getEmployeeById = asyncHandler(async (req, res) => {
         }
 
         // Send a successful response with the fetched employee data
+        const responseData = {
+            ...employee, // Spread all existing employee data
+            vpcUnitPrice: vpcPrice, // Add the fetched VPC price
+        };
+
         return res.status(200).json(
             new ApiResponse(
                 200,
-                employee,
+                responseData, // Send the combined data
                 "Employee profile fetched successfully."
             )
         );

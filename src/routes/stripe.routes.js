@@ -1,12 +1,13 @@
 import { Router } from 'express';
-import { createCheckoutSession, stripeWebhookHandler } from '../controllers/stripe.controller.js';
+import { createCheckoutSession, stripeWebhookHandler, mockFulfillPayment } from '../controllers/stripe.controller.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js'; // Your existing JWT middleware
 
 const router = Router();
 
 // Route to create a Stripe Checkout Session
 // This route should typically be protected, as only logged-in users should initiate payments.
-router.route("/create-checkout-session").post(verifyJWT, createCheckoutSession);
+// router.route("/create-checkout-session").post(verifyJWT, createCheckoutSession);
+router.route("/create-checkout-session").post(verifyJWT, mockFulfillPayment);
 
 // Route for Stripe webhooks
 // This route MUST NOT have any body parsing middleware applied (like express.json())

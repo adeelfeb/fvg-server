@@ -6,6 +6,105 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import prisma from '../db/index.js'; // Assuming this path to your Prisma client instance
 
+const saveEmployeesForClient = asyncHandler(async (req, res) => {
+    const clientId = req.user.id; // Authenticated client
+    const { employeeId } = req.body;
+
+    if (!employeeId) {
+        return res.status(400).json({ message: 'Employee ID is required.' });
+    }
+
+    // Optional: Check if the user is a CLIENT
+    if (req.user.role !== 'CLIENT') {
+        return res.status(403).json({ message: 'Only clients can save employees.' });
+    }
+
+    try {
+        // Attempt to create a new like
+        const saved = await prisma.likedContractor.create({
+            data: {
+                clientId: clientId,
+                contractorId: employeeId,
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Employee saved successfully.',
+            data: saved,
+        });
+    } catch (error) {
+        // Handle unique constraint error
+        if (error.code === 'P2002') {
+            return res.status(409).json({
+                success: false,
+                message: 'You have already saved this employee.',
+            });
+        }
+
+        console.error('Error saving employee:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Something went wrong while saving employee.',
+        });
+    }
+});
+
+const unsaveEmployeesForClient = asyncHandler(async (req, res) => {
+    const clientId = req.user.id; // Authenticated client
+    const { employeeId } = req.body;
+
+    if (!employeeId) {
+        return res.status(400).json({ message: 'Employee ID is required.' });
+    }
+
+    // Optional: Check if the user is a CLIENT
+    if (req.user.role !== UserRole.CLIENT) {
+        return res.status(403).json({ message: 'Only clients can unsave employees.' });
+    }
+
+    try {
+        // First check if the record exists
+        const existing = await prisma.likedContractor.findUnique({
+            where: {
+                clientId_contractorId: {
+                    clientId: clientId,
+                    contractorId: employeeId,
+                },
+            },
+        });
+
+        if (!existing) {
+            return res.status(404).json({
+                success: false,
+                message: 'This employee is not in your saved list.',
+            });
+        }
+
+        // Delete the saved record
+        await prisma.likedContractor.delete({
+            where: {
+                clientId_contractorId: {
+                    clientId: clientId,
+                    contractorId: employeeId,
+                },
+            },
+        });
+        // console.log(`Employee with ID ${employeeId} unsaved successfully for client ${clientId}.`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Employee removed from saved list successfully.',
+        });
+    } catch (error) {
+        console.error('Error unsaving employee:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Something went wrong while unsaving employee.',
+        });
+    }
+});
+
 /**
  * @description Fetches a list of employees hired by the authenticated client.
  * @route POST /api/v1/users/hired-employees
@@ -101,6 +200,46 @@ const getHiredEmployeesForClient = asyncHandler(async (req, res) => {
     }
 });
 
+
+const getSavedEmployeesForClient = asyncHandler(async (req, res) => {
+    const clientId = req.user.id;
+
+    // Optional: Restrict access to CLIENT only
+    if (req.user.role !== 'CLIENT') {
+        return res.status(403).json({ message: 'Only clients can view saved employees.' });
+    }
+
+    try {
+        // Fetch saved contractors
+        const savedEmployees = await prisma.likedContractor.findMany({
+            where: {
+                clientId: clientId,
+            },
+            include: {
+                contractor: true, // this assumes you have a relation defined in Prisma schema
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Fetched saved employees successfully.',
+            data: savedEmployees,
+        });
+    } catch (error) {
+        console.error('Error fetching saved employees:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Something went wrong while fetching saved employees.',
+        });
+    }
+});
+
+
+
+
 export {
     getHiredEmployeesForClient,
+    saveEmployeesForClient,
+    unsaveEmployeesForClient,
+    getSavedEmployeesForClient
 };

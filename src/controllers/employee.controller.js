@@ -134,6 +134,22 @@ const getEmployeeById = asyncHandler(async (req, res) => {
 
         const isAlreadyHired = !!existingHireRecord; // true if a record exists, false otherwise
 
+        let hasSavedEmployee = false;
+
+        if (!isAlreadyHired) {
+        const likedRecord = await prisma.likedContractor.findUnique({
+            where: {
+            clientId_contractorId: {
+                clientId,
+                contractorId: employeeId,
+            },
+            },
+        });
+
+        hasSavedEmployee = !!likedRecord;
+        }
+
+
         const vpcPriceRecord = await prisma.vpcPricing.findFirst({
             where: { isActive: true },
             orderBy: { createdAt: 'desc' },
@@ -219,13 +235,14 @@ const getEmployeeById = asyncHandler(async (req, res) => {
         if (!employee) {
             throw new ApiError(404, "Employee not found or profile is not available.");
         }
-
-        // 3. Send the isAlreadyHired flag along with the data
+        
         const responseData = {
-            ...employee,
-            vpcUnitPrice: vpcPrice,
-            isAlreadyHired: isAlreadyHired, // Add this flag
+        ...employee,
+        vpcUnitPrice: vpcPrice,
+        isAlreadyHired,
+        hasSavedEmployee, // ✅ new flag
         };
+
 
         return res.status(200).json(
             new ApiResponse(

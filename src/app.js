@@ -49,8 +49,7 @@ const corsOptions = {
   },
   credentials: true, // Allow credentials (cookies, authorization headers, etc.)
   optionsSuccessStatus: 200, // For legacy browser support
-  exposedHeaders: ['set-cookie'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],  
+  exposedHeaders: ['set-cookie'], 
   allowedHeaders: ['Content-Type', 'Authorization']  
 };
 

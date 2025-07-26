@@ -20,22 +20,11 @@ const getContractorsByCategory = asyncHandler(async (req, res) => {
             throw new ApiError(400, "Please provide at least one filter: roleType or verticalSpecialization.");
         }
 
-        // Updated helper function to convert slug (e.g., 'dental-admin') to UPPER CASE (e.g., 'DENTAL ADMIN')
-        const formatSlugToTitleCase = (slug) => {
-            if (!slug) return '';
-            return slug.split('-')
-                       .map(word => word.toUpperCase())
-                       .join(' ');
-        };
+        // console.log("Fetching contractors with filters:", { roleType, verticalSpecialization });
 
-        // Convert incoming slugs to the format expected in the database (uppercase)
-        const formattedRoleTypes = roleType && roleType.length > 0
-            ? roleType.map(slug => formatSlugToTitleCase(slug))
-            : [];
+        const formattedRoleTypes = roleType || [];
+        const formattedVerticalSpecializations = verticalSpecialization || [];
 
-        const formattedVerticalSpecializations = verticalSpecialization && verticalSpecialization.length > 0
-            ? verticalSpecialization.map(slug => formatSlugToTitleCase(slug))
-            : [];
 
         // console.log("Fetching contractors with formatted filters:", { formattedRoleTypes, formattedVerticalSpecializations });
 
@@ -194,26 +183,26 @@ const getEmployeeById = asyncHandler(async (req, res) => {
                     resumeUrl: isAlreadyHired,
                     portfolioUrl: isAlreadyHired,
 
-                    hipaaCertified: true,
-                    professionalCertValid: true,
-                    signedNda: true,
-                    backgroundCheck: true,
-                    criminalRecordCheck: true,
-                    gdprTraining: true,
-                    pciCompliance: true,
-                    socialMediaScreening: true,
-                    usInsuranceCompliance: true,
-                    canadaInsuranceCompliance: true,
-                    willingToSignNda: true,
-                    willingBackgroundCheck: true,
-                    willingReferenceCheck: true,
-                    privacyPolicyConsent: true,
-                    creditCheck: true,
-                    vulnerableSectorCheck: true,
-                    contactConsent: true,
-                    emailConsent: true,
-                    createdAt: true,
-                    updatedAt: true,
+                    hipaaCertified: isAlreadyHired,
+                    professionalCertValid: isAlreadyHired,
+                    signedNda: isAlreadyHired,
+                    backgroundCheck: isAlreadyHired,
+                    criminalRecordCheck: isAlreadyHired,
+                    gdprTraining: isAlreadyHired,
+                    pciCompliance: isAlreadyHired,
+                    socialMediaScreening: isAlreadyHired,
+                    usInsuranceCompliance: isAlreadyHired,
+                    canadaInsuranceCompliance: isAlreadyHired,
+                    willingToSignNda: isAlreadyHired,
+                    willingBackgroundCheck: isAlreadyHired,
+                    willingReferenceCheck: isAlreadyHired,
+                    privacyPolicyConsent: isAlreadyHired,
+                    creditCheck: isAlreadyHired,
+                    vulnerableSectorCheck: isAlreadyHired,
+                    contactConsent: isAlreadyHired,
+                    emailConsent: isAlreadyHired,
+                    createdAt: isAlreadyHired,
+                    updatedAt: isAlreadyHired,
                 },
             },
         };
@@ -261,138 +250,6 @@ const getEmployeeById = asyncHandler(async (req, res) => {
     }
 });
 
-// const getEmployeeById = asyncHandler(async (req, res) => {
-//     try {
-//         const { employeeId } = req.body; // Extract employeeId from the request body
-
-//         // console.log("Request body (employeeId):", employeeId); // Debugging line to check the request body
-
-//         if (!employeeId) {
-//             throw new ApiError(400, "Employee ID is required in the request body.");
-//         }
-
-//         const vpcPriceRecord = await prisma.vpcPricing.findFirst({
-//             where: { isActive: true },
-//             orderBy: { createdAt: 'desc' }, // Get the most recent active price if multiple somehow exist
-//         });
-
-//         let vpcPrice = null;
-//         if (vpcPriceRecord) {
-//             // Convert cents back to dollars for the API response
-//             vpcPrice = vpcPriceRecord.unitPrice / 100;
-//         }
-
-//         const employee = await prisma.user.findUnique({
-//             where: {
-//                 id: employeeId,
-//                 // Uncomment the line below if you only want to fetch profiles for users with the 'CONTRACTOR' role.
-//                 // role: UserRole.CONTRACTOR,
-//             },
-//             select: {
-//                 id: true,
-//                 firstName: true,
-//                 lastName: true,
-//                 // Only include email/phoneNumber if genuinely needed for public profile view,
-//                 // otherwise it's a privacy concern.
-//                 email: true,
-//                 phoneNumber: true,
-//                 createdAt: true,
-//                 updatedAt: true,
-//                 profile: {
-//                     select: {
-//                         id: true, // Profile ID
-//                         isVerified: true,
-
-//                         // --- MODIFIED FIELDS (Matching your schema) ---
-//                         roleType: true,
-//                         verticalSpecialization: true,
-//                         rateRange: true,
-//                         englishProficiency: true,
-//                         availability: true,
-//                         finalCost: true, // Correct: matches schema
-//                         otherRoleType: true,
-//                         otherVertical: true, // Correct: matches schema
-//                         yearsExperience: true,
-//                         skills: true,
-//                         remoteTools: true,
-//                         spokenLanguages: true,
-//                         otherLanguage: true,
-//                         customRate: true,
-//                         resumeUrl: true,
-//                         profilePhotoUrl: true,
-//                         internetSpeedScreenshotUrl: true,
-//                         timezone: true,
-//                         country: true,
-//                         otherCountry: true,
-//                         videoIntroductionUrl: true, // Correct: matches schema
-//                         portfolioUrl: true,
-
-//                         // --- Compliance fields (Matching your schema) ---
-//                         hipaaCertified: true,
-//                         professionalCertValid: true, // Correct: matches schema
-//                         signedNda: true,
-//                         backgroundCheck: true, // Correct: matches schema
-//                         criminalRecordCheck: true,
-//                         gdprTraining: true, // Correct: matches schema
-//                         pciCompliance: true, // Correct: matches schema
-//                         socialMediaScreening: true, // Correct: matches schema
-//                         usInsuranceCompliance: true, // Correct: matches schema
-//                         canadaInsuranceCompliance: true, // Correct: matches schema
-//                         willingToSignNda: true,
-//                         willingBackgroundCheck: true, // Correct: matches schema
-//                         willingReferenceCheck: true, // Correct: matches schema
-//                         privacyPolicyConsent: true, // Correct: matches schema
-//                         creditCheck: true,
-//                         vulnerableSectorCheck: true,
-//                         contactConsent: true, // Correct: matches schema
-//                         emailConsent: true, // Correct: matches schema
-
-//                         createdAt: true,
-//                         updatedAt: true,
-//                         // Do NOT include `user` or `userId` here unless you specifically need to nest
-//                         // the user object *within* the profile selection, which is usually redundant
-//                         // as the parent `employee` object already contains the user details.
-//                     },
-//                 },
-//             },
-//         });
-
-//         if (!employee) {
-//             // If no employee is found with the given ID (or filters if applied)
-//             throw new ApiError(404, "Employee not found or profile is not available.");
-//         }
-
-//         // Send a successful response with the fetched employee data
-//         const responseData = {
-//             ...employee, // Spread all existing employee data
-//             vpcUnitPrice: vpcPrice, // Add the fetched VPC price
-//         };
-
-//         return res.status(200).json(
-//             new ApiResponse(
-//                 200,
-//                 responseData, // Send the combined data
-//                 "Employee profile fetched successfully."
-//             )
-//         );
-
-//     } catch (error) {
-//         // Log the detailed error for debugging purposes on the server
-//         console.error("Error fetching employee by ID:", error);
-
-//         // Determine if it's a known API error or an unexpected one
-//         const apiError = error instanceof ApiError
-//             ? error
-//             : new ApiError(
-//                 500,
-//                 "An unexpected error occurred while fetching the employee profile.",
-//                 error.message // Pass the original error message for more detail
-//             );
-
-//         // Re-throw the ApiError so the asyncHandler can catch it and send a standardized error response
-//         throw apiError;
-//     }
-// });
 
 
 

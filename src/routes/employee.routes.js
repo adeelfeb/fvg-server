@@ -7,10 +7,10 @@ const router = Router();
 
 // Public routes (no authentication needed)
 router.route("/single-employee").post(verifyJWT, getEmployeeById);
-router.route("/category/login").post(verifyJWT, getContractorsByCategory);
+router.route("/category/login").post( getContractorsByCategory);
 router.route("/category/free").post( getContractorsByCategory);
 router.route("/verified").post(getVerifiedContractors);
-router.route("/login").post(verifyJWT, getVerifiedContractorsLogin);
+// router.route("/login").post(getVerifiedContractorsLogin);
 
 // Example of a protected route:
 // To protect a route, simply add `verifyJWT` before your controller function.

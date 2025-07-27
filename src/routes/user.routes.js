@@ -8,7 +8,7 @@ const router = Router();
 router.route('/hired-employees').post(verifyJWT, getHiredEmployeesForClient    )
 router.route('/save-employee').post(verifyJWT, saveEmployeesForClient    )
 router.route('/unsave-employee').post(verifyJWT, unsaveEmployeesForClient    )
-router.route('/unsave-employee').post(verifyJWT, getSavedEmployeesForClient    )
+router.route('/all-saved-employees').post(verifyJWT, getSavedEmployeesForClient    )
 
 
 export default router;

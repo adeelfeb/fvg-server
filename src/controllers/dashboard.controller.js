@@ -200,30 +200,53 @@ const getHiredEmployeesForClient = asyncHandler(async (req, res) => {
     }
 });
 
-
 const getSavedEmployeesForClient = asyncHandler(async (req, res) => {
     const clientId = req.user.id;
+    // console.log("Fetching saved employees for client:", clientId);
 
-    // Optional: Restrict access to CLIENT only
     if (req.user.role !== 'CLIENT') {
         return res.status(403).json({ message: 'Only clients can view saved employees.' });
     }
 
     try {
-        // Fetch saved contractors
         const savedEmployees = await prisma.likedContractor.findMany({
             where: {
                 clientId: clientId,
             },
             include: {
-                contractor: true, // this assumes you have a relation defined in Prisma schema
+                contractor: {
+                    include: {
+                        profile: true,
+                    },
+                },
             },
+        });
+
+        const formattedEmployees = savedEmployees.map(item => {
+            const contractor = item.contractor;
+            const profile = contractor.profile || {};
+
+            return {
+                id: contractor.id,
+                firstName: contractor.firstName,
+                lastName: contractor.lastName,
+                profile: {
+                    profilePhotoUrl: profile.profilePhotoUrl || null,
+                    roleType: profile.roleType || [],
+                    verticalSpecialization: profile.verticalSpecialization || [],
+                    finalCost: profile.finalCost || 0,
+                    country: profile.country || '',
+                    timezone: profile.timezone || '',
+                    availability: profile.availability || '',
+                    yearsExperience: profile.yearsExperience || 0,
+                },
+            };
         });
 
         return res.status(200).json({
             success: true,
             message: 'Fetched saved employees successfully.',
-            data: savedEmployees,
+            data: formattedEmployees,
         });
     } catch (error) {
         console.error('Error fetching saved employees:', error);
@@ -233,7 +256,6 @@ const getSavedEmployeesForClient = asyncHandler(async (req, res) => {
         });
     }
 });
-
 
 
 

@@ -1,25 +1,24 @@
 import express from 'express';
-import cors from 'cors'; // COMMENT THIS OUT FOR NOW
-import cookieParser from 'cookie-parser'; // COMMENT THIS OUT FOR NOW
-import session from 'express-session'; // COMMENT THIS OUT
-import passport from './passport.js'; // COMMENT THIS OUT
-import config from './config/index.js'; // COMMENT THIS OUT FOR NOW
-import { ApiError } from './utils/ApiError.js'; // COMMENT THIS OUT FOR NOW
-import { ApiResponse } from './utils/ApiResponse.js'; // COMMENT THIS OUT FOR NOW
+import cors from 'cors'; 
+import cookieParser from 'cookie-parser';  
+import session from 'express-session';  
+import passport from './passport.js'; 
+import config from './config/index.js';  
+import { ApiError } from './utils/ApiError.js'; 
+import { ApiResponse } from './utils/ApiResponse.js';  
 
 const app = express();
 
 
-app.use(express.json({ limit: "10mb" })); // Keep basic JSON parser
-app.use(express.urlencoded({ extended: true, limit: "10mb" })); // Keep basic URL parser
+app.use(express.json({ limit: "10mb" }));  
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));  
 app.use(express.static("public"));  
 app.use(cookieParser()); 
 app.use(session({
     secret: config.sessionSecret,
-    resave: false, // Don't save session if unmodified
-    saveUninitialized: false, // Don't create session until something is stored
-    cookie: {
-        // IMPORTANT: secure must be true in production (HTTPS)
+    resave: false,  
+    saveUninitialized: false,  
+    cookie: { 
         secure: config.nodeEnv === 'production',
         httpOnly: false, // Set to false to allow client-side JS access
         sameSite: 'None', // Required for cross-origin cookies
@@ -67,12 +66,17 @@ import employeeRouter from './routes/employee.routes.js';
 import stripeRouter from './routes/stripe.routes.js';
 import adminRouter from './routes/admin.routes.js';
 // import testRouter from './routes/test.routes.js'
+import loxoRouter from './routes/loxo.routes.js';
+
 
 app.use('/api/v1/auth', authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/employee", employeeRouter);
 app.use("/api/v1/stripe", stripeRouter);
 app.use("/api/v1/admin", adminRouter);
+app.use('/api/v1/loxo', loxoRouter);
+
+
 
 // app.use("/api/v1/test", testRouter);
 

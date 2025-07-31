@@ -11,14 +11,17 @@ const config = {
     db: {
         user: process.env.DB_USER,
         host: process.env.DB_HOST,
-        database: process.env.DB_DATABASE, // <-- CORRECTED THIS LINE
+        database: process.env.DB_DATABASE,  
         password: process.env.DB_PASSWORD,
-        port: parseInt(process.env.DB_PORT || '5432', 10), // Ensure port is a number
+        port: parseInt(process.env.DB_PORT || '5432', 10),  
         ssl: {
-            rejectUnauthorized: process.env.NODE_ENV === 'production' ? true : false // Render handles SSL in production, local might need false
+            rejectUnauthorized: process.env.NODE_ENV === 'production' ? true : false  
         }
     },
-    corsOrigin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [], // Handle multiple origins
+    loxoApiKey: process.env.LOXO_API_KEY,
+    loxoSlug: process.env.LOXO_SLUG, 
+    loxoDomain: process.env.LOXO_DOMAIN || 'app.loxo.co', 
+    corsOrigin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [],  
     sessionSecret: process.env.SESSION_SECRET,
     accessTokenSecret: process.env.ACCESS_TOKEN_SECRET,
     refreshTokenSecret: process.env.REFRESH_TOKEN_SECRET,

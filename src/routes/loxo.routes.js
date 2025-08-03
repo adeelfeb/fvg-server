@@ -1,12 +1,18 @@
 // src/routes/loxo.routes.js
 import { Router } from "express";
-import { getJobs, applyToLoxoJob } from "../controllers/loxo.controller.js";
-import { verifyJWT } from "../middlewares/auth.middleware.js"; // Optional protection
+import {
+  getJobs,
+  applyToLoxoJob,
+  getSelectedCandidates,
+  getHiredCandidates
+} from "../controllers/loxo.controller.js";
 
 const router = Router();
 
-// Public or protected based on your design
-router.get("/jobs", getJobs); // You can add `verifyJWT` here if needed
+router.get("/jobs", getJobs);
 router.post("/apply", applyToLoxoJob);
+
+router.get("/jobs/:jobId/selected-candidates", getSelectedCandidates);
+router.get("/jobs/:jobId/hired-candidates", getHiredCandidates);
 
 export default router;

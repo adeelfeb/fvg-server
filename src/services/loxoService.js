@@ -12,3 +12,8 @@ export async function applyToJob(jobId, candidateData) {
   });
   return data;
 }
+
+export async function fetchCandidatesByJob(jobId) {
+  const { data } = await loxoClient.get(`/jobs/${jobId}/candidates`);
+  return data;
+}

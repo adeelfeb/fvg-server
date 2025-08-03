@@ -4,19 +4,24 @@ import {
   getJobs,
   applyToLoxoJob,
   getSelectedCandidates,
-  getHiredCandidates,
-  getCandidateStageName
+  getPreQualifiedCandidates,
+  getStagingIds,
+  getJobById
 } from "../controllers/loxo.controller.js";
 
 const router = Router();
 
 router.get("/jobs", getJobs);
+router.get("/jobs/:jobId", getJobById);
 router.post("/apply", applyToLoxoJob);
 
 router.get("/jobs/:jobId/selected-candidates", getSelectedCandidates);
-router.get("/jobs/:jobId/hired-candidates", getHiredCandidates);
 
-router.get('/jobs/:jobId/candidates/:candidateId/stage', getCandidateStageName);
+
+router.get('/candidates/pre-qualified', getPreQualifiedCandidates);
+
+
+router.get('/stages-Id', getStagingIds);
 
 
 export default router;

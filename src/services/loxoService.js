@@ -17,3 +17,22 @@ export async function fetchCandidatesByJob(jobId) {
   const { data } = await loxoClient.get(`/jobs/${jobId}/candidates`);
   return data;
 }
+
+
+
+////////////////////////
+
+
+
+
+
+export async function fetchWorkflowsWithStages() {
+  // pulls all pipelines with embedded stage arrays
+  const { data } = await loxoClient.get('/deal_workflows');
+  return data; // array of workflows
+}
+
+export async function fetchAllWorkflowStages() {
+  const { data } = await loxoClient.get('/workflow_stages');
+  return data; // flat array of stages
+}

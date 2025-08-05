@@ -91,9 +91,10 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
   const newlyAddedEmployees = []; // ✅ Store newly added employees
 
   for (const candidate of filteredCandidates) {
-    const existingEmployee = await prisma.employee.findUnique({
+    const existingEmployee = await prisma.employee.findFirst({
       where: {
-        id: candidate.id,
+        loxoCandidateId: candidate.id,
+        jobId: candidate.jobId,
       },
     });
 
@@ -101,7 +102,7 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
 
     const createdEmployee = await prisma.employee.create({
       data: {
-        id: candidate.id,
+        loxoCandidateId: candidate.id,
         position: candidate.position,
         jobId: candidate.jobId,
         jobTitle: candidate.jobTitle,
@@ -111,7 +112,7 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
 
         person: {
           create: {
-            id: candidate.person.id,
+            loxoCandidateId: candidate.id, 
             name: candidate.person.name,
             profile_picture_thumb_url: candidate.person.profile_picture_thumb_url,
             profile_picture_original_url: candidate.person.profile_picture_original_url,

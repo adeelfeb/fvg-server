@@ -208,9 +208,10 @@ model Payment {
 
 
 model Employee {
-  id                        Int             @id                     // employee id
-  position                  Int?
+  id                        Int             @id @default(autoincrement())  // ✅ Auto-generated PK
+  loxoCandidateId           Int?
   workflow_stage_id         Int?
+  position                    Int? 
   candidate_rejection_reason String?
   jobId                     Int?
   jobTitle                  String?

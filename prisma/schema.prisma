@@ -204,3 +204,94 @@ model Payment {
   @@index([stripeSessionId])
   @@index([stripePaymentIntentId])
 }
+
+
+
+model Employee {
+  id                        Int             @id                     // employee id
+  position                  Int?
+  workflow_stage_id         Int?
+  candidate_rejection_reason String?
+  jobId                     Int?
+  jobTitle                  String?
+  jobPublishedName          String?
+
+  // Relations
+  personId                  Int             @unique
+  person                    Person          @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  latestPersonEventId       Int?            @unique
+  latest_person_event       PersonEvent?    @relation(fields: [latestPersonEventId], references: [id], onDelete: SetNull)
+
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+}
+
+model Person {
+  id                         Int             @id                     // person.id
+  name                       String
+  profile_picture_thumb_url  String?
+  profile_picture_original_url String?
+  location                   String?
+  address                    String?
+  city                       String?
+  state                      String?
+  zip                        String?
+  country                    String?
+  current_title              String?
+  current_company            String?
+  current_compensation       String?
+  compensation               String?
+  compensation_notes         String?
+  compensation_currency_id   Int?
+  salary                     String?
+  salary_type_id             Int?
+
+  owned_by_id                Int?
+  created_by_id              Int?
+  updated_by_id              Int?
+  created_at                 DateTime?
+  updated_at                 DateTime?
+  linkedin_url               String?
+
+  // Nested relations
+  emails                     Email[]
+  phones                     Phone[]
+  person_types               PersonType[]
+
+  employee                   Employee?       @relation
+}
+
+model Email {
+  id             Int     @id                // email id from API
+  value          String
+  email_type_id  Int?
+  person         Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId       Int
+}
+
+model Phone {
+  id             Int     @id                // phone id from API
+  value          String
+  phone_type_id  Int?
+  person         Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId       Int
+}
+
+model PersonType {
+  id        Int     @id
+  name      String
+  person    Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId  Int
+}
+
+model PersonEvent {
+  id               Int       @id
+  activity_type_id Int?
+  created_at       DateTime?
+  created_by_id    Int?
+  updated_at       DateTime?
+  updated_by_id    Int?
+
+  employee         Employee?
+}

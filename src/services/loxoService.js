@@ -70,6 +70,47 @@ export async function fetchAllWorkflowStages() {
 /**
  * Fetch candidates from all jobs (only works if jobs exist and return valid candidates)
  */
+// export async function fetchAllCandidatesFromAllJobs() {
+//   try {
+//     const result = await fetchJobs();
+
+//     const jobs = result?.jobs?.results;
+
+//     if (!Array.isArray(jobs)) {
+//       throw new Error('Expected jobs to be an array');
+//     }
+
+//     let allCandidates = [];
+
+//     for (const job of jobs) {
+//       try {
+//         console.log(`Fetching candidates for job ID: ${job.id} | Title: ${job.title}`);
+
+//         const response = await fetchCandidatesByJob(job.id);
+//         const candidates = response?.candidates || [];
+
+//         // Add jobId and jobTitle to each candidate
+//         const enriched = candidates.map(c => ({
+//           ...c,
+//           jobId: job.id,
+//           jobTitle: job.title,
+//           jobPublishedName: job.published_name
+//         }));
+
+//         allCandidates.push(...enriched);
+//       } catch (innerError) {
+//         console.warn(`⚠️ Failed to fetch candidates for job ID ${job.id}:`, innerError.message || innerError);
+//         continue;
+//       }
+//     }
+
+//     return allCandidates;
+//   } catch (error) {
+//     console.error('❌ Error in fetchAllCandidatesFromAllJobs:', error.message || error);
+//     throw new Error('Failed to fetch candidates from all jobs');
+//   }
+// }
+
 export async function fetchAllCandidatesFromAllJobs() {
   try {
     const result = await fetchJobs();
@@ -82,14 +123,14 @@ export async function fetchAllCandidatesFromAllJobs() {
 
     let allCandidates = [];
 
-    for (const job of jobs) {
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
       try {
-        console.log(`Fetching candidates for job ID: ${job.id} | Title: ${job.title}`);
+        console.log(`➡️  [${i + 1}/${jobs.length}] Fetching candidates for job ID: ${job.id} | Title: ${job.title}`);
 
         const response = await fetchCandidatesByJob(job.id);
         const candidates = response?.candidates || [];
 
-        // Add jobId and jobTitle to each candidate
         const enriched = candidates.map(c => ({
           ...c,
           jobId: job.id,

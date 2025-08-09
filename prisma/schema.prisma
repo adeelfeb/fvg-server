@@ -22,8 +22,9 @@ model User {
   id                  String   @id @default(uuid())
   email               String   @unique
   password            String?
-  firstName           String
-  lastName            String
+  firstName           String?
+  lastName            String?
+  fullName            String? 
   phoneNumber         String?  @unique
   role                UserRole @default(CLIENT)
   createdAt           DateTime @default(now())
@@ -39,6 +40,8 @@ model User {
 
   // Relationships
   profile         Profile?
+  loxoId          Int?      @unique  
+  loxoJobs        LoxoJob[]  
   meetings        Meeting[]
   refreshTokens   RefreshToken[]
   hiredContracts  ClientContractor[] @relation("clientHires")
@@ -49,6 +52,20 @@ model User {
   payments            Payment[] 
 
   @@index([googleId])
+}
+
+model LoxoJob {
+  id                    String @id @default(uuid())
+  loxoCandidateId       Int    @unique // Loxo's unique candidate ID
+  jobId                 Int
+  jobTitle              String
+  jobPublishedName      String?
+  
+  userId                String
+  user                  User   @relation(fields: [userId], references: [id])
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model Profile {
@@ -229,7 +246,8 @@ model Employee {
 }
 
 model Person {
-  id                         Int             @id                     // person.id
+  id                         Int             @id @default(autoincrement())
+  loxoId                     Int?     @unique 
   name                       String
   profile_picture_thumb_url  String?
   profile_picture_original_url String?
@@ -264,35 +282,37 @@ model Person {
 }
 
 model Email {
-  id             Int     @id                // email id from API
+  id             Int      @id @default(autoincrement()) // ✅ New auto-incrementing PK
+  loxoId         Int?     @unique // Store the Loxo Email ID here
   value          String
   email_type_id  Int?
   person         Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
   personId       Int
 }
-
 model Phone {
-  id             Int     @id                // phone id from API
-  value          String
-  phone_type_id  Int?
-  person         Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
-  personId       Int
+  id            Int      @id @default(autoincrement()) // 🆕 New auto-incrementing primary key
+  loxoId        Int?     @unique // 🆕 Store the Loxo ID here to avoid conflicts
+  value         String
+  phone_type_id Int?
+  person        Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId      Int
 }
 
 model PersonType {
-  id        Int     @id
-  name      String
-  person    Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
-  personId  Int
+  id            Int      @id @default(autoincrement()) // 🆕 New auto-incrementing primary key
+  loxoId        Int?     @unique // 🆕 Store the Loxo ID here
+  name          String
+  person        Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId      Int
 }
 
 model PersonEvent {
-  id               Int       @id
-  activity_type_id Int?
-  created_at       DateTime?
-  created_by_id    Int?
-  updated_at       DateTime?
-  updated_by_id    Int?
-
-  employee         Employee?
+  id                 Int      @id @default(autoincrement()) // 🆕 New auto-incrementing primary key
+  loxoId             Int?     @unique // 🆕 Store the Loxo ID here
+  activity_type_id   Int?
+  created_at         DateTime?
+  created_by_id      Int?
+  updated_at         DateTime?
+  updated_by_id      Int?
+  employee           Employee?
 }

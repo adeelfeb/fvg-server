@@ -111,11 +111,12 @@ export async function fetchAllCandidatesFromAllJobs() {
     }
 
     let allCandidates = [];
+    let jobsLength = jobs.length
 
     for (let i = 0; i < jobs.length; i++) {
       const job = jobs[i];
       try {
-        console.log(`➡️  [${i + 1}/${jobs.length}]`);
+        console.log(`➡️  [${i + 1}/${jobsLength}] Job is: ${job.title} (ID: ${job.id})`);
         const candidates = await fetchCandidatesByJob(job.id);
         const enriched = candidates.map(c => ({
           ...c,

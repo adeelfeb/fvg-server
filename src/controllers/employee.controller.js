@@ -273,7 +273,7 @@ const getEmployeeById = asyncHandler(async (req, res) => {
 
 const getVerifiedContractors = asyncHandler(async (req, res) => {
     try {
-        // console.log("Fetching verified contractors...");
+        console.log("Fetching verified contractors...");
         const verifiedContractors = await prisma.user.findMany({
             where: {
                 role: UserRole.CONTRACTOR,
@@ -306,8 +306,8 @@ const getVerifiedContractors = asyncHandler(async (req, res) => {
                 },
             },
         });
-
-        // If no contractors are found, return an empty array and a success message
+        
+        console.log("Verified contractors fetched successfully:", verifiedContractors.length, verifiedContractors);
         if (!verifiedContractors || verifiedContractors.length === 0) {
             return res.status(200).json(
                 new ApiResponse(200, [], "No verified contractors found at this time.")

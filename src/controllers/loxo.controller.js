@@ -70,6 +70,33 @@ export const getSelectedCandidates = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, selected, `Selected candidates fetched ${selected.length} for job ${jobId}`));
 });
 
+
+
+
+export const getAllCandidatesInAJob = asyncHandler(async (req, res) => {
+  const { jobId } = req.params;
+
+  if (!jobId) {
+    throw new ApiError(400, "Missing jobId");
+  }
+
+  const response = await fetchCandidatesByJob(jobId);
+  const candidates = Array.isArray(response?.candidates)
+    ? response.candidates
+    : response?.candidates?.results || [];
+
+  // console.log("Fetched candidates for job:", jobId, candidates.length);
+  // candidates.forEach(c => {
+  //   console.log(`Candidate ID: ${c.id}, Name: ${c.name}, Stage ID: ${c.workflow_stage_id}`);
+  // });
+
+  if (!candidates || candidates.length === 0) {
+    return res.status(404).json(new ApiResponse(404, null, "No candidates found for this job"));
+  }
+
+  return res.status(200).json(new ApiResponse(200, candidates, `All candidates fetched ${candidates.length} for job ${jobId}`));
+});
+
 /////////////////////////////
 
 
@@ -123,6 +150,7 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
                         firstName: candidate.person.name?.split(/\s+/)[0] || existingLoxoJob.user.firstName,
                         lastName: candidate.person.name?.split(/\s+/).slice(1).join(' ') || existingLoxoJob.user.lastName,
                         email: candidate.person.emails?.[0]?.value || `noemail-${candidate.person.id}@placeholder.loxo`,
+                        role: UserRole.CONTRACTOR,
                         profile: {
                             update: {
                                 country: candidate.person.country || existingLoxoJob.user.profile.country,
@@ -155,6 +183,7 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
                         lastName,
                         fullName: candidate.person.name || null,
                         email: candidate.person.emails?.[0]?.value || `noemail-${candidate.person.id}@placeholder.loxo`,
+                        role: UserRole.CONTRACTOR,
                         profile: {
                             create: {
                                 country: candidate.person.country || null,

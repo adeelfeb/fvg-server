@@ -7,7 +7,8 @@ import {
   getPreQualifiedCandidates,
   getStagingIds,
   getJobById,
-  getAllCandidatesInEveryStage
+  getAllCandidatesInEveryStage,
+  getAllCandidatesInAJob
 } from "../controllers/loxo.controller.js";
 
 const router = Router();
@@ -17,6 +18,9 @@ router.get("/jobs/:jobId", getJobById);
 router.post("/apply", applyToLoxoJob);
 
 router.get("/jobs/:jobId/selected-candidates", getSelectedCandidates);
+
+
+router.get("/jobs/:jobId/all-candidates", getAllCandidatesInAJob);
 
 
 router.get('/candidates/pre-qualified', getPreQualifiedCandidates);

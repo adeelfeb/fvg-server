@@ -3,7 +3,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { fetchJobs, applyToJob, fetchCandidatesByJob, fetchAllCandidatesFromAllJobs, fetchAllWorkflowStages, fetchJobById } from "../services/loxoService.js";
-import prisma from '../db/index.js';     
+import prisma, { UserRole } from '../db/index.js';
+
 
 export const getJobs = asyncHandler(async (req, res) => {
   const jobs = await fetchJobs();
@@ -76,25 +77,15 @@ export const getSelectedCandidates = asyncHandler(async (req, res) => {
 export const getAllCandidatesInAJob = asyncHandler(async (req, res) => {
   const { jobId } = req.params;
 
+  
   if (!jobId) {
     throw new ApiError(400, "Missing jobId");
   }
-
+  
   const response = await fetchCandidatesByJob(jobId);
-  const candidates = Array.isArray(response?.candidates)
-    ? response.candidates
-    : response?.candidates?.results || [];
+  
 
-  // console.log("Fetched candidates for job:", jobId, candidates.length);
-  // candidates.forEach(c => {
-  //   console.log(`Candidate ID: ${c.id}, Name: ${c.name}, Stage ID: ${c.workflow_stage_id}`);
-  // });
-
-  if (!candidates || candidates.length === 0) {
-    return res.status(404).json(new ApiResponse(404, null, "No candidates found for this job"));
-  }
-
-  return res.status(200).json(new ApiResponse(200, candidates, `All candidates fetched ${candidates.length} for job ${jobId}`));
+  return res.status(200).json(new ApiResponse(200, response, `All candidates fetched ${response.length} for job ${jobId}`));
 });
 
 /////////////////////////////
@@ -145,22 +136,33 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
             if (existingLoxoJob) {
                 // Update the existing user's profile with the new data
                 await prisma.user.update({
-                    where: { id: existingLoxoJob.userId },
-                    data: {
-                        firstName: candidate.person.name?.split(/\s+/)[0] || existingLoxoJob.user.firstName,
-                        lastName: candidate.person.name?.split(/\s+/).slice(1).join(' ') || existingLoxoJob.user.lastName,
-                        email: candidate.person.emails?.[0]?.value || `noemail-${candidate.person.id}@placeholder.loxo`,
-                        role: UserRole.CONTRACTOR,
-                        profile: {
-                            update: {
-                                country: candidate.person.country || existingLoxoJob.user.profile.country,
-                                profilePhotoUrl: candidate.person.profile_picture_original_url || existingLoxoJob.user.profile.profilePhotoUrl,
-                                roleType: candidate.person.current_title ? [candidate.person.current_title] : existingLoxoJob.user.profile.roleType,
-                                rateRange: candidate.person.compensation ? String(candidate.person.compensation) : existingLoxoJob.user.profile.rateRange,
-                            }
-                        }
+                  where: { id: existingLoxoJob.userId },
+                  data: {
+                    firstName: candidate.person.name?.split(/\s+/)[0] || existingLoxoJob.user.firstName,
+                    lastName: candidate.person.name?.split(/\s+/).slice(1).join(' ') || existingLoxoJob.user.lastName,
+                    email: candidate.person.emails?.[0]?.value || `noemail-${candidate.person.id}@placeholder.loxo`,
+                    role: UserRole.CONTRACTOR,
+                    profile: {
+                      update: {
+                        country: candidate.person.country || existingLoxoJob.user.profile.country,
+                        profilePhotoUrl: candidate.person.profile_picture_original_url || existingLoxoJob.user.profile.profilePhotoUrl,
+                        roleType: candidate.person.current_title ? [candidate.person.current_title] : existingLoxoJob.user.profile.roleType,
+                        rateRange: candidate.person.compensation ? String(candidate.person.compensation) : existingLoxoJob.user.profile.rateRange,
+
+                        // NEW fields
+                        loxoCreatedAt: candidate.person.created_at ? new Date(candidate.person.created_at) : existingLoxoJob.user.profile.loxoCreatedAt,
+                        loxoUpdatedAt: candidate.person.updated_at ? new Date(candidate.person.updated_at) : existingLoxoJob.user.profile.loxoUpdatedAt,
+                        isBlocked: candidate.person.blocked ?? existingLoxoJob.user.profile.isBlocked,
+                        sourceType: candidate.person.source_type?.name || existingLoxoJob.user.profile.sourceType,
+                        salary: candidate.person.salary ?? existingLoxoJob.user.profile.salary,
+                        salaryTypeId: candidate.person.salary_type_id ?? existingLoxoJob.user.profile.salaryTypeId,
+                        compensation: candidate.person.compensation ?? existingLoxoJob.user.profile.compensation,
+                        workflowStageId: candidate.workflow_stage_id ?? existingLoxoJob.user.profile.workflowStageId,
+                      }
                     }
+                  }
                 });
+
                 continue;
             }
 
@@ -177,23 +179,34 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
                 const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
 
                 const createdUser = await prisma.user.create({
-                    data: {
-                        loxoId: candidate.person.id,
-                        firstName,
-                        lastName,
-                        fullName: candidate.person.name || null,
-                        email: candidate.person.emails?.[0]?.value || `noemail-${candidate.person.id}@placeholder.loxo`,
-                        role: UserRole.CONTRACTOR,
-                        profile: {
-                            create: {
-                                country: candidate.person.country || null,
-                                profilePhotoUrl: candidate.person.profile_picture_original_url || null,
-                                roleType: candidate.person.current_title ? [candidate.person.current_title] : [],
-                                rateRange: candidate.person.compensation ? String(candidate.person.compensation) : null,
-                            },
-                        },
-                    },
+                  data: {
+                    loxoId: candidate.person.id,
+                    firstName,
+                    lastName,
+                    fullName: candidate.person.name || null,
+                    email: candidate.person.emails?.[0]?.value || `noemail-${candidate.person.id}@placeholder.loxo`,
+                    role: UserRole.CONTRACTOR,
+                    profile: {
+                      create: {
+                        country: candidate.person.country || null,
+                        profilePhotoUrl: candidate.person.profile_picture_original_url || null,
+                        roleType: candidate.person.current_title ? [candidate.person.current_title] : [],
+                        rateRange: candidate.person.compensation ? String(candidate.person.compensation) : null,
+
+                        // NEW fields
+                        loxoCreatedAt: candidate.person.created_at ? new Date(candidate.person.created_at) : null,
+                        loxoUpdatedAt: candidate.person.updated_at ? new Date(candidate.person.updated_at) : null,
+                        isBlocked: candidate.person.blocked ?? null,
+                        sourceType: candidate.person.source_type?.name || null,
+                        salary: candidate.person.salary ?? null,
+                        salaryTypeId: candidate.person.salary_type_id ?? null,
+                        compensation: candidate.person.compensation ?? null,
+                        workflowStageId: candidate.workflow_stage_id ?? null,
+                      }
+                    }
+                  },
                 });
+
                 userId = createdUser.id;
             }
 

@@ -1,7 +1,7 @@
 let pool;
 
 // src/db/prisma.js (or src/db/index.js)
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserRole } from '@prisma/client';
 
 // Initialize Prisma Client
 // It's good practice to make the client accessible globally or in a single place.
@@ -33,4 +33,4 @@ const getDbPool = () => {
     return pool;
 };
 
-export { connectDB };
+export { connectDB, UserRole };

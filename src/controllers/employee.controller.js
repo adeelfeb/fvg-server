@@ -307,7 +307,7 @@ const getVerifiedContractors = asyncHandler(async (req, res) => {
             },
         });
         
-        console.log("Verified contractors fetched successfully:", verifiedContractors.length, verifiedContractors);
+        console.log("Verified contractors fetched successfully:", verifiedContractors.length);
         if (!verifiedContractors || verifiedContractors.length === 0) {
             return res.status(200).json(
                 new ApiResponse(200, [], "No verified contractors found at this time.")

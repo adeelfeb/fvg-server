@@ -68,7 +68,10 @@ import adminRouter from './routes/admin.routes.js';
 // import testRouter from './routes/test.routes.js'
 import loxoRouter from './routes/loxo.routes.js';
 
+import authorizeNetRouter from './routes/authorizeNet.routes.js';
 
+
+app.use("/api/v1/authorize-net", authorizeNetRouter);
 app.use('/api/v1/auth', authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/employee", employeeRouter);

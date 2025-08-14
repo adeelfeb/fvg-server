@@ -63,19 +63,15 @@ app.use(passport.session()); // Enable Passport session support
 import authRouter from './routes/auth.routes.js';
 import userRouter from './routes/user.routes.js';
 import employeeRouter from './routes/employee.routes.js';
-import stripeRouter from './routes/stripe.routes.js';
+import paymentRouter from './routes/payment.routes.js';
 import adminRouter from './routes/admin.routes.js';
 // import testRouter from './routes/test.routes.js'
 import loxoRouter from './routes/loxo.routes.js';
 
-import authorizeNetRouter from './routes/authorizeNet.routes.js';
-
-
-app.use("/api/v1/authorize-net", authorizeNetRouter);
 app.use('/api/v1/auth', authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/employee", employeeRouter);
-app.use("/api/v1/stripe", stripeRouter);
+app.use("/api/v1/payment", paymentRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use('/api/v1/loxo', loxoRouter);
 
@@ -98,13 +94,19 @@ app.get("/health", (req, res) => {
 
 // Global error handling middleware (must be the last middleware)
 app.use((err, req, res, next) => {
-    console.error("Global Error Handler:", err);
-    // Ensure all errors are ApiError instances or convert them
-    const error = err instanceof ApiError ? err : new ApiError(500, err.message || "Internal Server Error");
+    const error = err instanceof ApiError 
+        ? err 
+        : new ApiError(500, err.message || "Internal Server Error");
+
+    // Only log if it's a real server issue (5xx)
+    if (error.statusCode >= 500) {
+        console.error("Global Error Handler:", err);
+    }
 
     res.status(error.statusCode).json(
         new ApiResponse(error.statusCode, null, error.message, error.errors)
     );
 });
+
 
 export { app };

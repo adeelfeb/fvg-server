@@ -59,7 +59,7 @@ const verifyJWT = asyncHandler(async (req, res, next) => {
         next();
 
     } catch (error) {
-        console.error("Error in verifyJWT middleware:", error);
+        // console.error("Error in verifyJWT middleware:", error);
 
         if (error instanceof ApiError) {
             throw error; // Re-throw custom API errors

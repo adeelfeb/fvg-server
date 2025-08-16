@@ -2,16 +2,54 @@ import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import prisma from '../db/index.js';
+import { nanoid } from "nanoid"; 
 
 const AUTHORIZE_API_LOGIN_ID = process.env.AUTHORIZE_API_LOGIN_ID;
 const AUTHORIZE_TRANSACTION_KEY = process.env.AUTHORIZE_TRANSACTION_KEY;
-const AUTHORIZE_API_URL = 'https://apitest.authorize.net/xml/v1/request.api'; // Sandbox
+const AUTHORIZE_API_URL = 'https://apitest.authorize.net/xml/v1/request.api'; 
+
+/**
+ * Get dynamic amount for employee based on their ID
+ * @param {string} employeeId 
+ * @returns {Promise<number>} amount
+ */
+export async function getEmployeeAmount(employeeId) {
+  // Fetch employee details (you decide what fields matter)
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: {
+      hourlyRate: true,
+      hoursWorked: true,
+      fixedSalary: true,
+    },
+  });
+
+  if (!employee) {
+    throw new Error(`Employee with id ${employeeId} not found`);
+  }
+
+  // Example logic: If fixed salary exists, use that
+  // Otherwise calculate using hourly rate * hoursWorked
+  let amount = 0;
+
+  if (employee.fixedSalary) {
+    amount = employee.fixedSalary;
+  } else if (employee.hourlyRate && employee.hoursWorked) {
+    amount = employee.hourlyRate * employee.hoursWorked;
+  } else {
+    throw new Error(`No valid payment data for employee ${employeeId}`);
+  }
+
+  // Make sure it’s a float with 2 decimals
+  return parseFloat(amount.toFixed(2));
+}
+
 
 export const processAuthorizePayment = asyncHandler(async (req, res) => {
   const { employeeId, vpcCount, opaqueData } = req.body;
   const userId = req.user?.id;
 
-  console.log("started working gon it:", vpcCount)
+  // console.log("started working gon it:", vpcCount)
 
   if (!userId) throw new ApiError(401, 'Not authenticated');
   if (!employeeId) throw new ApiError(400, 'Employee ID required');
@@ -20,10 +58,11 @@ export const processAuthorizePayment = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Missing payment token data');
   }
 
-  // Example: dynamic amount
-  const amount = 49.99;
+  let amount = 40
+  console.log("the keys are ", AUTHORIZE_API_LOGIN_ID, AUTHORIZE_TRANSACTION_KEY)
 
-  const payload = {
+  // Example: dynamic amount
+    const payload = {
     createTransactionRequest: {
       merchantAuthentication: {
         name: AUTHORIZE_API_LOGIN_ID,
@@ -38,9 +77,6 @@ export const processAuthorizePayment = asyncHandler(async (req, res) => {
             dataValue: opaqueData.dataValue,
           },
         },
-        customer: {
-          id: userId,
-        },
       },
     },
   };
@@ -51,6 +87,10 @@ export const processAuthorizePayment = asyncHandler(async (req, res) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   }).then(r => r.json());
+
+  // console.log("the rep0osen aftre changing :", authNetResponse)
+  // console.log("Authorize.Net full response:", JSON.stringify(authNetResponse, null, 2));
+
 
   const resultCode = authNetResponse?.transactionResponse?.responseCode;
   const transactionId = authNetResponse?.transactionResponse?.transId;

@@ -36,7 +36,7 @@ model User {
   emailVerified       Boolean  @default(false)
   verificationToken   String?
 
-   vpcCredits            Int               @default(0) 
+  vpcCredits            Int               @default(0) 
 
   // Relationships
   profile         Profile?
@@ -226,8 +226,8 @@ model Payment {
   currency            String    // e.g., 'usd'
   status              String    // e.g., 'paid', 'pending', 'failed', 'refunded'
   description         String?   // Optional: A brief description of what was purchased
-  // You can add a JSON field for storing full Stripe event data or metadata if needed
-  // metadata            Json?     // Requires @prisma/client@2.23.0 or later and database support
+
+  authorizeTransactionId String?
 
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt

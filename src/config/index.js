@@ -18,6 +18,7 @@ const config = {
             rejectUnauthorized: process.env.NODE_ENV === 'production' ? true : false  
         }
     },
+    frontendUrl: process.env.FRONTEND_URL || 'https://fvg-global-assist.webflow.io/',
     loxoApiKey: process.env.LOXO_API_KEY,
     loxoSlug: process.env.LOXO_SLUG, 
     loxoDomain: process.env.LOXO_DOMAIN || 'app.loxo.co', 

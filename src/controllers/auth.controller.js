@@ -22,6 +22,17 @@ const formatStringForDatabase = (str) => {
               .join(' ');
 };
 
+// A simple verify handler that uses your middleware first
+export const verifyUser = (req, res) => {
+  // At this point, verifyJWT has already run and attached req.user
+  res.status(200).json({
+    success: true,
+    message: "Token verified successfully",
+    user: req.user,   // send back user if needed
+  });
+};
+
+
 const registerEmployee = asyncHandler(async (req, res) => {
     try {
         // --- 1. DESTRUCTURE AND VALIDATE INPUT ---

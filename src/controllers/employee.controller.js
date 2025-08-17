@@ -273,12 +273,11 @@ const getEmployeeById = asyncHandler(async (req, res) => {
 
 const getVerifiedContractors = asyncHandler(async (req, res) => {
     try {
-        console.log("Fetching verified contractors...");
         const verifiedContractors = await prisma.user.findMany({
             where: {
                 role: UserRole.CONTRACTOR,
                 profile: {
-                    isVerified: false, // Filter by the new isVerified field
+                    isVerified: true, // Filter by the new isVerified field
                 },
             },
             select: {

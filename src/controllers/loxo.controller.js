@@ -145,6 +145,7 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
                     profile: {
                       update: {
                         country: candidate.person.country || existingLoxoJob.user.profile.country,
+                        isVerified: true,
                         profilePhotoUrl: candidate.person.profile_picture_original_url || existingLoxoJob.user.profile.profilePhotoUrl,
                         roleType: candidate.person.current_title ? [candidate.person.current_title] : existingLoxoJob.user.profile.roleType,
                         rateRange: candidate.person.compensation ? String(candidate.person.compensation) : existingLoxoJob.user.profile.rateRange,
@@ -189,6 +190,7 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
                     profile: {
                       create: {
                         country: candidate.person.country || null,
+                        isVerified: true,
                         profilePhotoUrl: candidate.person.profile_picture_original_url || null,
                         roleType: candidate.person.current_title ? [candidate.person.current_title] : [],
                         rateRange: candidate.person.compensation ? String(candidate.person.compensation) : null,

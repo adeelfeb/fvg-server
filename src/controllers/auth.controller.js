@@ -37,17 +37,63 @@ export const verifyUser = (req, res) => {
 export const verifyEmail = async (req, res) => {
   const { token } = req.query;
 
-  const user = await prisma.user.findFirst({ where: { verifyToken: token } });
+  // Find the user by verificationToken
+  const user = await prisma.user.findFirst({ where: { verificationToken: token } });
   if (!user) throw new ApiError(400, "Invalid or expired token");
 
+  // Update the user: mark email as verified and remove the token
   await prisma.user.update({
     where: { id: user.id },
-    data: { verified: true, verifyToken: null },
+    data: { emailVerified: true, verificationToken: null, verificationExpiry: null },
   });
 
   res.json(new ApiResponse(200, null, "Email verified successfully"));
 };
 
+// Route: POST /send-verification
+export const sendVerificationCode = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) throw new ApiError(400, "Email is required");
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) throw new ApiError(404, "User not found");
+
+  if (user.emailVerified) throw new ApiError(400, "Email is already verified");
+
+
+  try {
+    // Generate a new token and expiry
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationExpiry = new Date(Date.now() + 1000 * 60 * 15); // 15 min
+
+    // Save token and expiry
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { verificationToken, verificationExpiry }
+    });
+
+    // Send the verification email
+    const emailResult = await sendVerificationEmail(user.email, verificationToken);
+
+    if (!emailResult.success) {
+      throw new ApiError(500, "Verification email could not be sent. Please try again later.");
+    }
+
+    console.log("all done and comleted", emailResult)
+
+    // Success response
+    res.json(new ApiResponse(200, null, "Verification email sent successfully"));
+  } catch (err) {
+    console.error("Error sending verification email:", err);
+
+    if (err instanceof ApiError) {
+      res.status(err.statusCode).json(new ApiResponse(err.statusCode, null, err.message));
+    } else {
+      res.status(500).json(new ApiResponse(500, null, "Failed to send verification email"));
+    }
+  }
+});
 
 
 const registerUser = asyncHandler(async (req, res) => {
@@ -525,17 +571,12 @@ const registerUserNo = asyncHandler(async (req, res) => {
         if (!password) missingFields.push("password");
         if (!firstName) missingFields.push("firstName");
         if (!lastName) missingFields.push("lastName");
-        if (!role) missingFields.push("role");
-
+    
         if (missingFields.length > 0) {
             throw new ApiError(400, `The following fields are required: ${missingFields.join(", ")}`);
         }
 
-        // Validate the role against the UserRole enum
-        if (!Object.values(UserRole).includes(role)) { // More robust check
-            throw new ApiError(400, "Invalid user role specified");
-        }
-
+   
         // 2. Check if user already exists by email
         const existingUserByEmail = await prisma.user.findUnique({ where: { email } });
         if (existingUserByEmail) {
@@ -561,7 +602,8 @@ const registerUserNo = asyncHandler(async (req, res) => {
                 firstName,
                 lastName,
                 phoneNumber, // Pass the optional phone number
-                role
+                role: 'CLIENT',
+                emailVerified: true,
             }
         });
 

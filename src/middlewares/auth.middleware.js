@@ -76,23 +76,24 @@ const verifyJWT = asyncHandler(async (req, res, next) => {
 // Faster verifyJWT
 const fastVerifyJWT = asyncHandler(async (req, res, next) => {
   try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-    if (!token) throw new ApiError(401, "Access token missing");
-
-    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-
-    if (!decodedToken?._id) {
-      throw new ApiError(401, "Invalid Access Token: No user ID in token");
-    }
-
-    // Instead of always hitting DB:
-    req.user = decodedToken; // trust JWT claims
-    next();
-  } catch (error) {
+      const token = req.header("Authorization")?.replace("Bearer ", "");
+      if (!token) throw new ApiError(401, "Access token missing");
+      
+      const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+      
+      if (!decodedToken?._id) {
+          throw new ApiError(401, "Invalid Access Token: No user ID in token");
+        }
+        
+        // Instead of always hitting DB:
+        req.user = decodedToken; // trust JWT claims
+        next();
+    } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      throw new ApiError(401, "Access token expired");
+        console.log("got in the fastverification")
+      throw new ApiError(401, null, "Access token expired");
     }
-    throw new ApiError(401, "Invalid access token");
+    throw new ApiError(401, null, "Invalid access token");
   }
 });
 

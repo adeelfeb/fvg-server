@@ -123,6 +123,7 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
     const newlyAddedCandidates = [];
 
     for (const candidate of preQualifiedCandidates) {
+      console.log(`\n➡️ Processing candidate: ${candidate.person?.id} (${candidate.person?.name}) for jobId: ${candidate.jobTitle}`);
         try {
             // Check if a LoxoJob record already exists for this specific candidate and job.
             const existingLoxoJob = await prisma.loxoJob.findFirst({
@@ -174,11 +175,12 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
 
             if (existingUser) {
                 userId = existingUser.id;
+                console.log(`👤 Found existing user by loxoId: ${candidate.person.id} (userId: ${existingUser.id})`);
             } else {
                 const nameParts = candidate.person.name?.trim().split(/\s+/) || [];
                 const firstName = nameParts[0] || null;
                 const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
-
+                console.log(`✨ Creating new user for candidate ${candidate.person?.id} (${candidate.person?.name})`);
                 const createdUser = await prisma.user.create({
                   data: {
                     loxoId: candidate.person.id,
@@ -208,7 +210,7 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
                     }
                   },
                 });
-
+                console.log(`✅ Created user (userId: ${createdUser.id}) for candidate ${candidate.person?.id}`);
                 userId = createdUser.id;
             }
 
@@ -230,9 +232,12 @@ export const getPreQualifiedCandidates = asyncHandler(async (req, res) => {
                   userId: userId,
                 },
               });
+              console.log(`📌 Linked candidate ${candidate.person?.id} (userId: ${userId}) to job ${candidate.jobId}`);
 
               newlyAddedCandidates.push(createdLoxoJob);
             }
+
+            console.log(`\n🎯 Completed sync. ${newlyAddedCandidates.length} new candidates stored out of ${preQualifiedCandidates.length} total pre-qualified`);
         } catch (error) {
             console.error(`❌ Error processing candidate with loxoId: ${candidate.person.id} and jobId: ${candidate.jobId}`, error);
         }

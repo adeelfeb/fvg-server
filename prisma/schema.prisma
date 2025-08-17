@@ -25,7 +25,7 @@ model User {
   firstName           String?
   lastName            String?
   fullName            String? 
-  phoneNumber         String?  @unique
+  phoneNumber         String? 
   role                UserRole @default(CLIENT)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -35,6 +35,8 @@ model User {
   googleId            String?
   emailVerified       Boolean  @default(false)
   verificationToken   String?
+  verificationExpiry  DateTime?
+
 
   vpcCredits            Int               @default(0) 
 

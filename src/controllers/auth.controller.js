@@ -7,7 +7,8 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import prisma from '../db/index.js';
 import jwt from 'jsonwebtoken';
-
+import crypto from "crypto";
+import { sendVerificationEmail } from "../utils/email.js";
 
 
 // Define the helper function once, outside of the main handler functions
@@ -31,6 +32,96 @@ export const verifyUser = (req, res) => {
     user: req.user,   // send back user if needed
   });
 };
+
+
+export const verifyEmail = async (req, res) => {
+  const { token } = req.query;
+
+  const user = await prisma.user.findFirst({ where: { verifyToken: token } });
+  if (!user) throw new ApiError(400, "Invalid or expired token");
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { verified: true, verifyToken: null },
+  });
+
+  res.json(new ApiResponse(200, null, "Email verified successfully"));
+};
+
+
+
+const registerUser = asyncHandler(async (req, res) => {
+  try {
+    const { email, password, firstName, lastName, role, phoneNumber } = req.body;
+
+    // 1. Validation
+    const missingFields = [];
+    if (!email) missingFields.push("email");
+    if (!password) missingFields.push("password");
+    if (!firstName) missingFields.push("firstName");
+    if (!lastName) missingFields.push("lastName");
+
+    if (missingFields.length > 0) {
+      throw new ApiError(
+        400,
+        `The following fields are required: ${missingFields.join(", ")}`
+      );
+    }
+    // 2. Check if user exists by email
+    const existingUserByEmail = await prisma.user.findUnique({ where: { email } });
+    if (existingUserByEmail) {
+      throw new ApiError(409, "User with this email already exists");
+    }
+
+    // 2a. Check phone
+    if (phoneNumber) {
+      const existingUserByPhone = await prisma.user.findUnique({ where: { phoneNumber } });
+      if (existingUserByPhone) {
+        throw new ApiError(409, "User with this phone number already exists");
+      }
+    }
+
+    // 3. Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 4. Generate email verification token
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationExpiry = new Date(Date.now() + 1000 * 60 * 15); // 15 min expiry
+
+    // 5. Create user (unverified)
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        phoneNumber,
+        role: 'CLIENT',
+        emailVerified: false,
+        verificationToken,
+        verificationExpiry
+      }
+    });
+
+  
+    // 7. Send verification email
+    await sendVerificationEmail(user.email, verificationToken);
+
+    // 8. Return response (⚠️ Do not issue tokens yet, user is unverified!)
+    return res.status(201).json(
+      new ApiResponse(
+        201,
+        { userId: user.id, email: user.email },
+        "User registered successfully. Please verify your email before logging in."
+      )
+    );
+  } catch (error) {
+    console.error("Error during user registration:", error);
+
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(500, "An unexpected error occurred during registration.");
+  }
+});
 
 
 const registerEmployee = asyncHandler(async (req, res) => {
@@ -429,7 +520,7 @@ const generateAccessAndRefreshTokens = async (userId) => {
 
 
 
-const registerUser = asyncHandler(async (req, res) => {
+const registerUserNo = asyncHandler(async (req, res) => {
     try {
         // console.log("Registering user with data:", req.body); // Debugging log to see incoming data
         // Destructure the required fields from req.body
@@ -567,19 +658,26 @@ const loginUser = asyncHandler(async (req, res) => {
                 phoneNumber: true,
                 role: true,
                 createdAt: true,
-                password: true, // <--- ADD THIS LINE!
+                password: true, 
+                emailVerified: true,
             }
         });
 
         if (!user) {
             throw new ApiError(404, "User with this email does not exist");
         }
-
-        // 3. Compare password with hashed password
-        // Now, `user.password` will actually contain the hashed password from the DB
-        // So, this check will correctly identify users truly without a password (e.g., social logins)
-        // or allow bcrypt.compare to run if a password exists.
-        if (!user.password) { // This check is still good to differentiate social vs. local
+        
+        if (!user.emailVerified) {
+            return res.status(403).json(
+                new ApiResponse(
+                    403,
+                    { verified: false },
+                    "Email not verified. Please verify your email before logging in."
+                )
+            );
+        }
+        
+        if (!user.password) { 
             throw new ApiError(401, "Account set up without password. Please use social login.");
         }
         const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -587,6 +685,7 @@ const loginUser = asyncHandler(async (req, res) => {
         if (!isPasswordValid) {
             throw new ApiError(401, "Invalid user credentials");
         }
+
 
         // 4. Generate access and refresh tokens (JWT)
         const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user.id);
@@ -637,5 +736,6 @@ export {
     registerUser,
     loginUser,
     registerEmployee,
-    registerMultipleEmployees
+    registerMultipleEmployees,
+    registerUserNo
 };

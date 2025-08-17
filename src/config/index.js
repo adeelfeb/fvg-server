@@ -27,7 +27,11 @@ const config = {
     refreshTokenSecret: process.env.REFRESH_TOKEN_SECRET,
     accessTokenExpiry: process.env.ACCESS_TOKEN_EXPIRY,
     refreshTokenExpiry: process.env.REFRESH_TOKEN_EXPIRY,
-    nodeEnv: process.env.NODE_ENV || 'development'
+    nodeEnv: process.env.NODE_ENV || 'development',
+    smtpUser: process.env.SMTP_USER,
+    smtpPass: process.env.SMTP_PASS,
+    smtpHost: process.env.SMTP_HOST || "smtp.gmail.com",
+    smtpPort: process.env.SMTP_PORT || 587,
 };
 
 export default config;

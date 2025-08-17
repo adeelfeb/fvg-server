@@ -52,7 +52,8 @@ export const verifyEmail = async (req, res) => {
 
 const registerUser = asyncHandler(async (req, res) => {
   try {
-    const { email, password, firstName, lastName, role, phoneNumber } = req.body;
+
+    const { email, password, firstName, lastName, phoneNumber } = req.body;
 
     // 1. Validation
     const missingFields = [];
@@ -71,14 +72,6 @@ const registerUser = asyncHandler(async (req, res) => {
     const existingUserByEmail = await prisma.user.findUnique({ where: { email } });
     if (existingUserByEmail) {
       throw new ApiError(409, "User with this email already exists");
-    }
-
-    // 2a. Check phone
-    if (phoneNumber) {
-      const existingUserByPhone = await prisma.user.findUnique({ where: { phoneNumber } });
-      if (existingUserByPhone) {
-        throw new ApiError(409, "User with this phone number already exists");
-      }
     }
 
     // 3. Hash password

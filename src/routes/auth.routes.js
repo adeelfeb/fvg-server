@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registerUser, loginUser, registerEmployee, registerMultipleEmployees, verifyUser, verifyEmail, registerUserNo, sendVerificationCode } from '../controllers/auth.controller.js';
+import { registerUser, loginUser, registerEmployee, registerMultipleEmployees, verifyUser, verifyEmail, registerUserNo, sendVerificationCode, googleAuth, googleAuthCallback } from '../controllers/auth.controller.js';
 import {  fastVerifyJWT } from '../middlewares/auth.middleware.js'; 
 import passport from "../passport.js";
 
@@ -17,17 +17,8 @@ router.route("/Multi-register").post(registerMultipleEmployees);
 
 router.post("/send-verification", sendVerificationCode);
 router.post("/verify-email", verifyEmail);
-router.get("/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
 
-router.get("/google/callback",
-  passport.authenticate("google", { failureRedirect: "/login" }),
-  (req, res) => {
-    // Option 1: Set a cookie + redirect to Webflow frontend
-    res.redirect("https://fvg-global-assist.webflow.io/dashboard");
-    // Option 2: Generate a JWT and send as query param to frontend
-  }
-);
+router.get('/google', googleAuth);
+router.get('/google/callback', googleAuthCallback);
 
 export default router;

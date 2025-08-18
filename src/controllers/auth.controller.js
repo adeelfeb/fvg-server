@@ -9,6 +9,36 @@ import prisma from '../db/index.js';
 import jwt from 'jsonwebtoken';
 import crypto from "crypto";
 import { sendVerificationEmail } from "../utils/email.js";
+import passport from '../passport.js';
+
+export const googleAuth = passport.authenticate('google', { scope: ['profile', 'email'] });
+
+export const googleAuthCallback = (req, res, next) => {
+    passport.authenticate('google', { failureRedirect: '/login' }, async (err, user) => {
+        if (err || !user) {
+            return res.redirect('/login?error=google_auth_failed');
+        }
+
+        // Generate JWTs
+        const accessToken = jwt.sign(
+            { id: user.id, email: user.email, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        const refreshToken = jwt.sign(
+            { id: user.id },
+            process.env.JWT_REFRESH_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        // Option 2: Send JWT to frontend via query string
+        const frontendURL = new URL('https://fvg-global-assist.webflow.io/dashboard');
+        frontendURL.searchParams.set('token', accessToken);
+
+        return res.redirect(frontendURL.toString());
+    })(req, res, next);
+};
 
 
 // Define the helper function once, outside of the main handler functions

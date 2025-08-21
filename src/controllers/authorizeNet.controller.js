@@ -10,57 +10,81 @@ const AUTHORIZE_API_URL = 'https://apitest.authorize.net/xml/v1/request.api';
 
 /**
  * Get dynamic amount for employee based on their ID
- * @param {string} employeeId 
- * @returns {Promise<number>} amount
+/**
+ * Calculate the final amount for an employee hire request
+ * @param {string} employeeId
+ * @param {Object} hireDetails
+ * @param {number} hireDetails.weeks - number of weeks (1–4)
+ * @param {number} hireDetails.months - number of months (1–6)
  */
-export async function getEmployeeAmount(employeeId) {
-  // Fetch employee details (you decide what fields matter)
-  const employee = await prisma.employee.findUnique({
+export async function calculateEmployeeAmount(employeeId, { unit, value, vpcCount }) {
+  if (!employeeId) {
+    throw new ApiError(400, "Employee ID is required");
+  }
+
+  // Fetch employee profile
+  const profile = await prisma.profile.findUnique({
     where: { id: employeeId },
-    select: {
-      hourlyRate: true,
-      hoursWorked: true,
-      fixedSalary: true,
-    },
+    select: { finalCost: true },
   });
 
-  if (!employee) {
-    throw new Error(`Employee with id ${employeeId} not found`);
+  if (!profile) {
+    throw new ApiError(404, `Profile with ID ${employeeId} not found`);
+  }
+  if (profile.finalCost == null) {
+    throw new ApiError(400, `Employee ${employeeId} has no final cost set`);
   }
 
-  // Example logic: If fixed salary exists, use that
-  // Otherwise calculate using hourly rate * hoursWorked
-  let amount = 0;
+  if (!unit || !value) {
+    throw new ApiError(400, "Duration must include a unit and value");
+  }
 
-  if (employee.fixedSalary) {
-    amount = employee.fixedSalary;
-  } else if (employee.hourlyRate && employee.hoursWorked) {
-    amount = employee.hourlyRate * employee.hoursWorked;
+  // ---- Calculate base employee amount ----
+  let baseAmount = 0;
+
+  if (unit === "weeks") {
+    if (value < 1 || value > 52) {
+      throw new ApiError(400, "Weeks must be between 1 and 52");
+    }
+    baseAmount = profile.finalCost * 40 * value; // hourly × 40 hrs/week × weeks
+  } else if (unit === "months") {
+    if (value < 1 || value > 12) {
+      throw new ApiError(400, "Months must be between 1 and 12");
+    }
+    baseAmount = profile.finalCost * value; // monthly flat × months
   } else {
-    throw new Error(`No valid payment data for employee ${employeeId}`);
+    throw new ApiError(400, "Invalid duration unit (must be 'weeks' or 'months')");
   }
 
-  // Make sure it’s a float with 2 decimals
-  return parseFloat(amount.toFixed(2));
+  // ---- Fetch VPC Pricing from DB ----
+  let vpcPriceRecord = await prisma.vpcPricing.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: "desc" }, // in case multiple, use latest
+  });
+
+  let vpcUnitPrice = vpcPriceRecord ? vpcPriceRecord.unitPrice / 100 : 50; 
+  // fallback to $50 if no record
+
+  const vpcTotal = (parseInt(vpcCount, 10) || 0) * vpcUnitPrice;
+
+  const total = baseAmount + vpcTotal;
+
+  return parseFloat(total.toFixed(2));
 }
 
 
-export const processAuthorizePayment = asyncHandler(async (req, res) => {
-  const { employeeId, vpcCount, opaqueData } = req.body;
-  const userId = req.user?.id;
 
-  // console.log("started working gon it:", vpcCount)
+export const processAuthorizePayment = asyncHandler(async (req, res) => {
+  const { employeeId, opaqueData, duration } = req.body;
+  const userId = req.user?.id;
 
   if (!userId) throw new ApiError(401, 'Not authenticated');
   if (!employeeId) throw new ApiError(400, 'Employee ID required');
-  if (vpcCount == null || vpcCount < 0) throw new ApiError(400, 'Invalid VPC count');
   if (!opaqueData?.dataValue || !opaqueData?.dataDescriptor) {
     throw new ApiError(400, 'Missing payment token data');
   }
 
-  let amount = 40
-  console.log("the keys are ", AUTHORIZE_API_LOGIN_ID, AUTHORIZE_TRANSACTION_KEY)
-
+  const amount = await calculateEmployeeAmount(employeeId, duration);
   // Example: dynamic amount
     const payload = {
     createTransactionRequest: {

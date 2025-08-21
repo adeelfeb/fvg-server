@@ -732,15 +732,15 @@ const loginUser = asyncHandler(async (req, res) => {
             throw new ApiError(404, "User with this email does not exist");
         }
         
-        if (!user.emailVerified) {
-            return res.status(403).json(
-                new ApiResponse(
-                    403,
-                    { verified: false },
-                    "Email not verified. Please verify your email before logging in."
-                )
-            );
-        }
+        // if (!user.emailVerified) {
+        //     return res.status(403).json(
+        //         new ApiResponse(
+        //             403,
+        //             { verified: false },
+        //             "Email not verified. Please verify your email before logging in."
+        //         )
+        //     );
+        // }
         
         if (!user.password) { 
             throw new ApiError(401, "Account set up without password. Please use social login.");
